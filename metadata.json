@@ -1,0 +1,11 @@
+{
+  "name": "INTEL Research Intelligence",
+  "description": "Bilingual Hebrew and English holographic 3D scientific research, grounded evidence synthesis, and molecular dynamics simulation command center.",
+  "requestFramePermissions": [
+    "microphone",
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

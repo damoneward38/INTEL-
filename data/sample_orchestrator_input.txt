@@ -1,0 +1,1 @@
+Research benchmark study by pi@intel-research.org (2026) under DOI 10.1021/acs.jpcb.3c06662 evaluated thermostatted Lennard-Jones ensembles at 300 K and 1 atm with 95.8% energy stability. Repository: https://github.com/openmm/openmm

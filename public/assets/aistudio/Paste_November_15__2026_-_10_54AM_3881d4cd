@@ -1,0 +1,996 @@
+
+#!/usr/bin/env bash
+set -euo pipefail
+
+PROJECT="intel-all-upload"
+
+mkdir -p "$PROJECT"/{backend/app,backend/data,frontend/src}
+cd "$PROJECT"
+
+cat > backend/requirements.txt <<'EOF'
+fastapi
+uvicorn[standard]
+python-multipart
+pydantic
+pypdf
+python-docx
+pandas
+openpyxl
+python-magic
+Pillow
+pytesseract
+scipy
+statsmodels
+jinja2
+EOF
+
+cat > backend/app/main.py <<'EOF'
+from __future__ import annotations
+
+import hashlib
+import json
+import mimetypes
+import os
+import re
+import shutil
+import uuid
+import zipfile
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+import pandas as pd
+from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
+
+BASE = Path(__file__).resolve().parents[1]
+DATA = BASE / "data"
+UPLOADS = DATA / "uploads"
+EXTRACTED = DATA / "extracted"
+AUDIT = DATA / "audit.jsonl"
+
+MAX_FILE_BYTES = 100 * 1024 * 1024
+MAX_ARCHIVE_FILES = 2000
+MAX_ARCHIVE_EXPANDED = 500 * 1024 * 1024
+ALLOWED_EXTENSIONS = {
+    ".pdf", ".docx", ".txt", ".md", ".csv", ".tsv",
+    ".xlsx", ".xls", ".json", ".ipynb", ".zip",
+    ".pdb", ".cif", ".fasta", ".fa", ".fastq",
+    ".fq", ".sdf", ".mol", ".xyz", ".py", ". R",
+    ".js", ".ts", ".html", ".xml", ".yaml", ".yml"
+}
+
+for directory in (UPLOADS, EXTRACTED):
+    directory.mkdir(parents=True, exist_ok=True)
+
+app = FastAPI(
+    title="אינטל-All-Upload",
+    version="1.0.0",
+    description="Local-first scientific file ingestion and research analysis."
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
+
+
+def audit(event: dict[str, Any]) -> None:
+    record = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        **event,
+    }
+    with AUDIT.open("a", encoding="utf-8") as stream:
+        stream.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def safe_name(name: str) -> str:
+    name = Path(name or "upload.bin").name
+    name = re.sub(r"[^A-Za-z0-9._-]", "_", name)
+    return name[:180] or "upload.bin"
+
+
+def extract_text(path: Path, extension: str) -> str:
+    if extension == ".pdf":
+        from pypdf import PdfReader
+        reader = PdfReader(str(path))
+        return "\n".join(page.extract_text() or "" for page in reader.pages)
+
+    if extension == ".docx":
+        from docx import Document
+        doc = Document(str(path))
+        return "\n".join(p.text for p in doc.paragraphs)
+
+    if extension in {".csv", ".tsv"}:
+        delimiter = "\t" if extension == ".tsv" else ","
+        frame = pd.read_csv(path, sep=delimiter, nrows=10000)
+        return frame.to_csv(index=False)
+
+    if extension in {".xlsx", ".xls"}:
+        sheets = pd.read_excel(path, sheet_name=None)
+        return "\n\n".join(
+            f"## {name}\n{frame.head(10000).to_csv(index=False)}"
+            for name, frame in sheets.items()
+        )
+
+    if extension in {".json", ".ipynb"}:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if extension == ".ipynb":
+            cells = data.get("cells", [])
+            return "\n".join(
+                "".join(cell.get("source", []))
+                for cell in cells
+            )
+        return json.dumps(data, ensure_ascii=False, indent=2)
+
+    if extension in {
+        ".txt", ".md", ".py", ".r", ".js", ".ts",
+        ".html", ".xml", ".yaml", ".yml", ".pdb",
+        ".cif", ".fasta", ".fa", ".fastq", ".fq",
+        ".sdf", ".mol", ".xyz"
+    }:
+        return path.read_text(encoding="utf-8", errors="replace")
+
+    return ""
+
+
+def inspect_csv(text: str) -> dict[str, Any]:
+    try:
+        from io import StringIO
+        frame = pd.read_csv(StringIO(text))
+        missing = int(frame.isna().sum().sum())
+        total = int(frame.size)
+        return {
+            "rows": int(frame.shape[0]),
+            "columns": int(frame.shape[1]),
+            "column_names": list(map(str, frame.columns)),
+            "missing_cells": missing,
+            "missing_fraction": round(missing / total, 4) if total else 0,
+            "duplicate_rows": int(frame.duplicated().sum()),
+        }
+    except Exception as exc:
+        return {"inspection_error": str(exc)}
+
+
+def analyze_document(text: str, extension: str) -> dict[str, Any]:
+    words = re.findall(r"\b[\w'-]+\b", text)
+    lower = text.lower()
+
+    flags: list[dict[str, str]] = []
+    recommendations: list[dict[str, str]] = []
+
+    checks = {
+        "sample_size": ["sample size", "participants", "subjects", "n ="],
+        "randomization": ["randomized", "randomised", "randomization", "randomisation"],
+        "blinding": ["blinded", "blind", "double-blind", "double blind"],
+        "controls": ["control group", "control condition", "placebo", "negative control"],
+        "limitations": ["limitations", "limitation", "study limitations"],
+        "ethics": ["irb", "ethics approval", "ethical approval", "informed consent"],
+        "statistics": ["confidence interval", "p-value", "p value", "standard deviation"],
+        "preregistration": ["preregistered", "pre-registered", "clinicaltrials.gov", "osf.io"],
+    }
+
+    found = {key: any(term in lower for term in terms)
+             for key, terms in checks.items()}
+
+    for key, present in found.items():
+        if not present:
+            flags.append({
+                "code": f"NOT_DETECTED_{key.upper()}",
+                "severity": "review",
+                "message": f"No explicit {key.replace('_', ' ')} information detected. This may be absent or expressed differently."
+            })
+
+    if not found["controls"]:
+        recommendations.append({
+            "category": "design",
+            "priority": "high",
+            "action": "Review whether suitable control conditions are needed and scientifically justified."
+        })
+
+    if not found["statistics"]:
+        recommendations.append({
+            "category": "analysis",
+            "priority": "medium",
+            "action": "Document the statistical methods, uncertainty estimates, and analysis assumptions."
+        })
+
+    if not found["limitations"]:
+        recommendations.append({
+            "category": "reporting",
+            "priority": "medium",
+            "action": "Add a limitations section describing bias, uncertainty, and generalizability."
+        })
+
+    if not found["ethics"]:
+        recommendations.append({
+            "category": "ethics",
+            "priority": "high",
+            "action": "Have an appropriate human reviewer verify whether ethics approval, consent, or an exemption applies."
+        })
+
+    detected = sum(found.values())
+    score = round(100 * detected / len(found))
+
+    return {
+        "word_count": len(words),
+        "character_count": len(text),
+        "detected_sections": found,
+        "heuristic_completeness_score": score,
+        "score_warning": "This is a keyword-based completeness indicator, not a scientific validity or publication-readiness score.",
+        "flags": flags,
+        "recommendations": recommendations,
+        "data_profile": inspect_csv(text) if extension in {".csv", ".tsv"} else None,
+    }
+
+
+def inspect_archive(path: Path, destination: Path) -> dict[str, Any]:
+    extracted_files = []
+    total_size = 0
+
+    with zipfile.ZipFile(path) as archive:
+        members = archive.infolist()
+
+        if len(members) > MAX_ARCHIVE_FILES:
+            raise HTTPException(413, "Archive contains too many files.")
+
+        for member in members:
+            candidate = Path(member.filename)
+
+            if candidate.is_absolute() or ".." in candidate.parts:
+                raise HTTPException(400, "Unsafe archive path detected.")
+
+            if member.is_dir():
+                continue
+
+            total_size += member.file_size
+            if total_size > MAX_ARCHIVE_EXPANDED:
+                raise HTTPException(413, "Expanded archive exceeds size limit.")
+
+            target = destination / candidate
+            target.resolve().relative_to(destination.resolve())
+            target.parent.mkdir(parents=True, exist_ok=True)
+
+            with archive.open(member) as source, target.open("wb") as output:
+                shutil.copyfileobj(source, output)
+
+            extracted_files.append({
+                "path": str(target.relative_to(destination)),
+                "bytes": member.file_size,
+            })
+
+    return {
+        "archive_file_count": len(extracted_files),
+        "expanded_bytes": total_size,
+        "files": extracted_files,
+    }
+
+
+@app.get("/health")
+async def health():
+    return {
+        "status": "ok",
+        "service": "intel-all-upload",
+        "storage": "local",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@app.post("/api/v1/upload")
+async def upload(file: UploadFile = File(...)):
+    original_name = safe_name(file.filename or "upload.bin")
+    extension = Path(original_name).suffix.lower()
+
+    if extension not in ALLOWED_EXTENSIONS:
+        raise HTTPException(415, f"Unsupported file extension: {extension}")
+
+    upload_id = str(uuid.uuid4())
+    target = UPLOADS / f"{upload_id}_{original_name}"
+
+    size = 0
+    digest = hashlib.sha256()
+
+    try:
+        with target.open("wb") as output:
+            while chunk := await file.read(1024 * 1024):
+                size += len(chunk)
+
+                if size > MAX_FILE_BYTES:
+                    raise HTTPException(413, "File exceeds 100 MB limit.")
+
+                digest.update(chunk)
+                output.write(chunk)
+
+        checksum = digest.hexdigest()
+        result: dict[str, Any] = {
+            "upload_id": upload_id,
+            "filename": original_name,
+            "extension": extension,
+            "mime_type": mimetypes.guess_type(original_name)[0] or "application/octet-stream",
+            "size_bytes": size,
+            "sha256": checksum,
+            "storage": "local",
+            "analysis_status": "completed",
+        }
+
+        if extension == ".zip":
+            extraction_dir = EXTRACTED / upload_id
+            extraction_dir.mkdir(parents=True, exist_ok=True)
+            result["archive"] = inspect_archive(target, extraction_dir)
+            result["analysis_status"] = "archive_extracted_review_required"
+        else:
+            text = extract_text(target, extension)
+            text_path = EXTRACTED / f"{upload_id}.txt"
+            text_path.write_text(text, encoding="utf-8")
+
+            result["extracted_text_bytes"] = len(text.encode("utf-8"))
+            result["analysis"] = analyze_document(text, extension)
+
+        audit({
+            "event": "upload_processed",
+            "upload_id": upload_id,
+            "filename": original_name,
+            "sha256": checksum,
+            "size_bytes": size,
+            "extension": extension,
+        })
+
+        return JSONResponse(result)
+
+    except HTTPException:
+        target.unlink(missing_ok=True)
+        raise
+    except zipfile.BadZipFile:
+        target.unlink(missing_ok=True)
+        raise HTTPException(400, "Invalid ZIP archive.")
+    except Exception as exc:
+        target.unlink(missing_ok=True)
+        audit({
+            "event": "upload_failed",
+            "upload_id": upload_id,
+            "error": str(exc),
+        })
+        raise HTTPException(422, f"File processing failed: {exc}")
+
+
+class PlannerRequest(BaseModel):
+    research_question: str = Field(min_length=10, max_length=5000)
+    domain: str = Field(default="general", max_length=100)
+    context: str = Field(default="", max_length=20000)
+
+
+@app.post("/api/v1/plan")
+async def create_plan(request: PlannerRequest):
+    """
+    Deterministic starter planner.
+    Connect a locally hosted LLM behind this endpoint only after validating
+    its output against a strict schema and source-grounding requirements.
+    """
+    plan = {
+        "research_question": request.research_question,
+        "domain": request.domain,
+        "status": "draft_requires_expert_review",
+        "steps": [
+            {
+                "stage": "hypothesis",
+                "action": "Define a testable hypothesis and primary outcome."
+            },
+            {
+                "stage": "data",
+                "action": "Identify data provenance, inclusion criteria, missingness, and permissions."
+            },
+            {
+                "stage": "design",
+                "action": "Review controls, sample-size rationale, randomization, and bias risks."
+            },
+            {
+                "stage": "analysis",
+                "action": "Predefine statistical methods and sensitivity analyses."
+            },
+            {
+                "stage": "validation",
+                "action": "Validate results independently and document uncertainty."
+            },
+            {
+                "stage": "reporting",
+                "action": "Prepare a transparent report with reproducible methods and citations."
+            },
+        ],
+        "context_received": bool(request.context.strip()),
+        "execution_enabled": False,
+    }
+
+    audit({
+        "event": "research_plan_created",
+        "domain": request.domain,
+    })
+
+    return plan
+
+
+@app.get("/api/v1/audit")
+async def get_audit():
+    if not AUDIT.exists():
+        return {"events": []}
+
+    events = []
+    for line in AUDIT.read_text(encoding="utf-8").splitlines()[-500:]:
+        try:
+            events.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+
+    return {"events": events}
+
+
+@app.get("/api/v1/capabilities")
+async def capabilities():
+    return {
+        "ingest": [
+            "PDF text extraction",
+            "DOCX text extraction",
+            "CSV and TSV profiling",
+            "XLSX and XLS profiling",
+            "JSON and Jupyter notebook extraction",
+            "ZIP extraction with path and expansion checks",
+            "Plain text, source code, and sequence text",
+        ],
+        "analysis": [
+            "Heuristic methodology completeness review",
+            "Missing-data profiling",
+            "Review flags and improvement suggestions",
+            "SHA-256 integrity hashing",
+            "Local audit trail",
+        ],
+        "not_yet_integrated": [
+            "OCR engine",
+            "BioBERT and SciSpaCy",
+            "Cross-lingual embeddings",
+            "Neo4j and Wikidata",
+            "Ollama research planner",
+            "OpenMM and PySCF isolated runners",
+            "Three.js and Plotly visualizations",
+            "Authentication and multi-user authorization",
+            "Production malware scanning",
+            "Clinical decision support validation",
+        ],
+        "safety": {
+            "medical_decisions": "Not supported",
+            "automated_experiment_execution": "Disabled",
+            "human_review_required": True,
+        },
+    }
+EOF
+
+cat > backend/Dockerfile <<'EOF'
+FROM python:3.12-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libmagic1 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY app ./app
+RUN mkdir -p data/uploads data/extracted
+
+EXPOSE 8000
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+EOF
+
+cat > compose.yaml <<'EOF'
+services:
+  intel-upload:
+    build: ./backend
+    container_name: intel-all-upload
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/data:/app/data
+    environment:
+      PYTHONUNBUFFERED: "1"
+    restart: unless-stopped
+EOF
+
+cat > frontend/package.json <<'EOF'
+{
+  "name": "intel-all-upload-ui",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc -b && vite build"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "vite": "latest",
+    "typescript": "latest",
+    "react": "latest",
+    "react-dom": "latest"
+  },
+  "devDependencies": {}
+}
+EOF
+
+cat > frontend/index.html <<'EOF'
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>אינטל-All-Upload</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+EOF
+
+cat > frontend/tsconfig.json <<'EOF'
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true
+  },
+  "include": ["src"]
+}
+EOF
+
+cat > frontend/src/main.tsx <<'EOF'
+import React, { useState } from "react";
+import { createRoot } from "react-dom/client";
+import "./style.css";
+
+type UploadResult = {
+  upload_id: string;
+  filename: string;
+  extension: string;
+  mime_type: string;
+  size_bytes: number;
+  sha256: string;
+  analysis_status: string;
+  analysis?: {
+    word_count: number;
+    heuristic_completeness_score: number;
+    score_warning: string;
+    flags: { code: string; severity: string; message: string }[];
+    recommendations: { category: string; priority: string; action: string }[];
+    data_profile?: Record<string, unknown> | null;
+  };
+  archive?: Record<string, unknown>;
+};
+
+const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
+function App() {
+  const [file, setFile] = useState<File | null>(null);
+  const [result, setResult] = useState<UploadResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [dragging, setDragging] = useState(false);
+
+  async function upload(selected: File) {
+    setFile(selected);
+    setResult(null);
+    setError("");
+    setBusy(true);
+
+    try {
+      const body = new FormData();
+      body.append("file", selected);
+
+      const response = await fetch(`${API}/api/v1/upload`, {
+        method: "POST",
+        body
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.detail || "Upload failed");
+      }
+
+      setResult(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown upload error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function handleDrop(event: React.DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setDragging(false);
+    const selected = event.dataTransfer.files?.[0];
+    if (selected) void upload(selected);
+  }
+
+  return (
+    <main className="shell">
+      <header className="topbar">
+        <div className="brand">
+          <span className="brand-mark">א</span>
+          <div>
+            <strong>אינטל</strong>
+            <small>ALL-UPLOAD RESEARCH INTELLIGENCE</small>
+          </div>
+        </div>
+        <span className="local-status">LOCAL INGESTION</span>
+      </header>
+
+      <section className="hero">
+        <p className="eyebrow">UNIVERSAL RESEARCH WORKSPACE</p>
+        <h1>Turn your data into your next research step.</h1>
+        <p className="subtitle">
+          Upload research documents, datasets, notebooks, code, sequences,
+          and supported scientific files.
+        </p>
+      </section>
+
+      <section
+        className={`dropzone ${dragging ? "dragging" : ""}`}
+        onDragOver={event => {
+          event.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={handleDrop}
+      >
+        <div className="upload-icon">↑</div>
+        <h2>Drop a research file here</h2>
+        <p>Or select a file from your computer</p>
+        <label className="upload-button">
+          Choose file
+          <input
+            type="file"
+            onChange={event => {
+              const selected = event.target.files?.[0];
+              if (selected) void upload(selected);
+            }}
+          />
+        </label>
+        <small>Maximum 100 MB · ZIP expansion limited · Local storage</small>
+        {file && <p className="selected-file">{file.name}</p>}
+      </section>
+
+      {busy && <p className="notice">Processing file…</p>}
+      {error && <p className="error">{error}</p>}
+
+      {result && (
+        <section className="results">
+          <div className="result-heading">
+            <div>
+              <p className="eyebrow">INGESTION COMPLETE</p>
+              <h2>{result.filename}</h2>
+            </div>
+            <span className="success">PROCESSED</span>
+          </div>
+
+          <div className="metrics">
+            <article>
+              <small>FILE TYPE</small>
+              <strong>{result.extension}</strong>
+            </article>
+            <article>
+              <small>FILE SIZE</small>
+              <strong>{(result.size_bytes / 1024 / 1024).toFixed(2)} MB</strong>
+            </article>
+            <article>
+              <small>WORDS EXTRACTED</small>
+              <strong>{result.analysis?.word_count ?? "—"}</strong>
+            </article>
+            <article>
+              <small>COMPLETENESS INDICATOR</small>
+              <strong>
+                {result.analysis
+                  ? `${result.analysis.heuristic_completeness_score}/100`
+                  : "—"}
+              </strong>
+            </article>
+          </div>
+
+          {result.analysis && (
+            <>
+              <p className="warning">{result.analysis.score_warning}</p>
+
+              <h3>Review flags</h3>
+              {result.analysis.flags.length === 0 ? (
+                <p>No keyword-based review flags were detected.</p>
+              ) : (
+                <div className="recommendations">
+                  {result.analysis.flags.map(flag => (
+                    <article className="recommendation" key={flag.code}>
+                      <span className="priority">{flag.severity}</span>
+                      <strong>{flag.code}</strong>
+                      <p>{flag.message}</p>
+                    </article>
+                  ))}
+                </div>
+              )}
+
+              <h3>Improvement suggestions</h3>
+              <div className="recommendations">
+                {result.analysis.recommendations.map((item, index) => (
+                  <article className="recommendation" key={index}>
+                    <span className="priority">{item.priority}</span>
+                    <strong>{item.category}</strong>
+                    <p>{item.action}</p>
+                  </article>
+                ))}
+              </div>
+            </>
+          )}
+
+          {result.archive && (
+            <pre className="json">
+              {JSON.stringify(result.archive, null, 2)}
+            </pre>
+          )}
+
+          <details>
+            <summary>Integrity and processing metadata</summary>
+            <pre className="json">
+              {JSON.stringify({
+                upload_id: result.upload_id,
+                mime_type: result.mime_type,
+                sha256: result.sha256,
+                status: result.analysis_status
+              }, null, 2)}
+            </pre>
+          </details>
+        </section>
+      )}
+
+      <footer>
+        Research support only. Results require qualified human review.
+        This prototype does not diagnose, prescribe, or autonomously execute experiments.
+      </footer>
+    </main>
+  );
+}
+
+createRoot(document.getElementById("root")!).render(
+  <React.StrictMode><App /></React.StrictMode>
+);
+EOF
+
+cat > frontend/src/style.css <<'EOF'
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  color: #eaf5ff;
+  background: #07111f;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse at 50% -15%, #15365a 0, transparent 55%),
+    #07111f;
+}
+
+.shell {
+  width: min(1050px, calc(100% - 36px));
+  margin: 0 auto;
+  padding: 28px 0 50px;
+}
+
+.topbar, .brand, .result-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand { justify-content: flex-start; gap: 13px; }
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid #39d9ff;
+  border-radius: 12px;
+  color: #39d9ff;
+  font-size: 26px;
+}
+
+.brand strong { display: block; font-size: 20px; }
+.brand small, .eyebrow, .metrics small {
+  color: #8ca9c3;
+  letter-spacing: .14em;
+  font-size: 10px;
+}
+
+.local-status, .success, .priority {
+  color: #61e4ff;
+  border: 1px solid #1e7895;
+  padding: 7px 10px;
+  border-radius: 30px;
+  font-size: 10px;
+  letter-spacing: .1em;
+}
+
+.hero { padding: 70px 0 30px; text-align: center; }
+.eyebrow { color: #43d9ff; }
+.hero h1 { font-size: clamp(32px, 5vw, 55px); margin: 14px 0; }
+.subtitle { color: #9eb4c8; line-height: 1.7; }
+
+.dropzone {
+  border: 1px dashed #34718f;
+  background: #0b1c2d;
+  border-radius: 20px;
+  padding: 48px 20px;
+  text-align: center;
+  transition: .2s;
+}
+
+.dropzone.dragging {
+  border-color: #49e4ff;
+  background: #102b42;
+}
+
+.upload-icon {
+  font-size: 42px;
+  color: #4ce1ff;
+}
+
+.dropzone h2 { margin-bottom: 6px; }
+.dropzone p, .dropzone small { color: #9eb4c8; }
+
+.upload-button {
+  display: inline-block;
+  margin: 17px 0;
+  padding: 12px 24px;
+  background: #16b8d7;
+  color: #03121d;
+  border-radius: 9px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.upload-button input { display: none; }
+.selected-file { color: #63e4ff !important; }
+
+.results {
+  margin-top: 30px;
+  padding: 25px;
+  border: 1px solid #203e58;
+  border-radius: 16px;
+  background: #0a1929;
+}
+
+.result-heading h2 { overflow-wrap: anywhere; }
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin: 24px 0;
+}
+
+.metrics article, .recommendation {
+  background: #10243a;
+  border: 1px solid #203e58;
+  border-radius: 11px;
+  padding: 15px;
+}
+
+.metrics strong { display: block; margin-top: 8px; font-size: 22px; }
+.results h3 { margin-top: 28px; }
+.recommendations { display: grid; gap: 10px; }
+.recommendation strong { display: block; margin-top: 12px; }
+.recommendation p { color: #b0c4d7; line-height: 1.6; }
+.priority { display: inline-block; text-transform: uppercase; }
+.warning { color: #f3c77a; line-height: 1.6; }
+.notice { color: #65e3ff; }
+.error { color: #ff8989; }
+.json {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: #a9c9e2;
+  background: #06101b;
+  padding: 14px;
+  border-radius: 8px;
+}
+details { margin-top: 22px; color: #9eb4c8; }
+summary { cursor: pointer; }
+footer {
+  margin-top: 40px;
+  color: #718ba4;
+  font-size: 12px;
+  line-height: 1.7;
+  text-align: center;
+}
+
+@media (max-width: 600px) {
+  .shell { width: min(100% - 24px, 1050px); }
+  .hero { padding-top: 48px; }
+  .results { padding: 16px; }
+  .result-heading { align-items: flex-start; gap: 12px; flex-direction: column; }
+}
+EOF
+
+cat > README.md <<'EOF'
+# אינטל-All-Upload
+
+Local-first scientific file ingestion starter.
+
+## Run backend
+
+```bash
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+```
+
+## Run frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open http://localhost:5173
+
+## Run with Docker
+
+```bash
+docker compose up --build
+```
+
+API:
+- GET `/health`
+- GET `/api/v1/capabilities`
+- POST `/api/v1/upload`
+- POST `/api/v1/plan`
+- GET `/api/v1/audit`
+
+## Important
+
+This is an ingestion and heuristic-review starter, not a validated scientific
+or clinical decision system. It does not include OCR, BioBERT, SciSpaCy,
+Neo4j, a local LLM, or simulation execution yet. The capabilities endpoint
+lists integrations that remain unimplemented. Do not use its heuristic score
+as a measure of scientific validity or clinical readiness.
+
+Before production use, add authentication, authorization, malware scanning,
+rate limits, encrypted storage, retention controls, robust archive isolation,
+validated parsers, and security testing.
+EOF
+
+echo "INTEL-ALL-UPLOAD scaffold created at: $(pwd)"

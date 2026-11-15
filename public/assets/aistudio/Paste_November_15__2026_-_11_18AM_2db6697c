@@ -1,0 +1,1165 @@
+#!/usr/bin/env python3
+"""
+run.py — Local-first master pipeline orchestrator.
+
+Pipeline:
+    ingest
+    -> language detection
+    -> NLP extraction
+    -> local embeddings
+    -> knowledge graph
+    -> policy planning
+    -> optional isolated simulation
+    -> evaluation
+    -> policy update
+    -> protocol lock
+    -> report
+    -> optional safe Playwright UI audit
+
+Safety:
+    - Simulation is disabled unless --enable-simulator is supplied.
+    - No physical laboratory execution is implemented.
+    - No protocol is locked without a successful evaluation.
+    - Uploaded files are size-limited and never executed.
+    - Raw file bytes, credentials, and embedding vectors are excluded
+      from audit records.
+    - UI testing skips destructive and unapproved controls.
+    - Missing services cause explicit failures, not fake success.
+
+Install:
+    pip install aiohttp motor pypdf python-docx langdetect
+    pip install playwright
+    playwright install chromium
+
+Optional local services:
+    Ollama:       http://127.0.0.1:11434
+    Policy API:   http://127.0.0.1:8000
+    React UI:     http://127.0.0.1:3000
+    MongoDB:      mongodb://127.0.0.1:27017
+
+Run:
+    python run.py ./example.pdf
+    python run.py ./example.pdf --enable-simulator
+    python run.py ./example.pdf --test-ui
+"""
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import hashlib
+import json
+import logging
+import mimetypes
+import os
+import re
+import sqlite3
+import sys
+import time
+import uuid
+
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+import aiohttp
+
+
+# ============================================================
+# CONFIGURATION
+# ============================================================
+
+BASE_DIR = Path(__file__).resolve().parent
+DATA_DIR = BASE_DIR / "data"
+UPLOAD_DIR = DATA_DIR / "uploads"
+REPORT_DIR = DATA_DIR / "reports"
+LOG_DIR = BASE_DIR / "logs"
+
+MAX_FILE_SIZE = 25 * 1024 * 1024
+MAX_TEXT_LENGTH = 2_000_000
+HTTP_TIMEOUT = 60
+
+POLICY_ENDPOINT = os.getenv(
+    "POLICY_ENDPOINT",
+    "http://127.0.0.1:8000",
+).rstrip("/")
+
+OLLAMA_ENDPOINT = os.getenv(
+    "OLLAMA_ENDPOINT",
+    "http://127.0.0.1:11434",
+).rstrip("/")
+
+OLLAMA_MODEL = os.getenv(
+    "OLLAMA_MODEL",
+    "nomic-embed-text",
+)
+
+REACT_URL = os.getenv(
+    "REACT_URL",
+    "http://127.0.0.1:3000",
+)
+
+MONGODB_URI = os.getenv("MONGODB_URI")
+MONGODB_DATABASE = os.getenv("MONGODB_DATABASE", "master_pipeline")
+MONGODB_COLLECTION = os.getenv("MONGODB_COLLECTION", "audit_log")
+
+SIMULATOR_ENDPOINT = os.getenv(
+    "SIMULATOR_ENDPOINT",
+    "http://127.0.0.1:8000",
+).rstrip("/")
+
+ALLOWED_EXTENSIONS = {
+    ".txt",
+    ".md",
+    ".csv",
+    ".json",
+    ".pdf",
+    ".docx",
+}
+
+for directory in (DATA_DIR, UPLOAD_DIR, REPORT_DIR, LOG_DIR):
+    directory.mkdir(parents=True, exist_ok=True)
+
+
+# ============================================================
+# LOGGING
+# ============================================================
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s",
+    handlers=[
+        logging.FileHandler(LOG_DIR / "run.log", encoding="utf-8"),
+        logging.StreamHandler(sys.stdout),
+    ],
+)
+
+log = logging.getLogger("master_pipeline")
+
+
+# ============================================================
+# ERRORS
+# ============================================================
+
+class PipelineError(RuntimeError):
+    pass
+
+
+class ServiceError(PipelineError):
+    pass
+
+
+class ValidationError(PipelineError):
+    pass
+
+
+# ============================================================
+# UTILITIES
+# ============================================================
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def safe_json(value: Any) -> Any:
+    try:
+        json.dumps(value)
+        return value
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def safe_filename(name: str) -> str:
+    name = Path(name).name
+    name = re.sub(r"[^A-Za-z0-9._-]", "_", name)
+    return name[:150] or "upload"
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+
+    return digest.hexdigest()
+
+
+def validate_file(path: Path) -> Path:
+    path = path.expanduser().resolve()
+
+    if not path.is_file():
+        raise ValidationError(f"Not a file: {path}")
+
+    if path.suffix.lower() not in ALLOWED_EXTENSIONS:
+        raise ValidationError(
+            f"Unsupported extension: {path.suffix}"
+        )
+
+    size = path.stat().st_size
+
+    if size <= 0:
+        raise ValidationError("The input file is empty.")
+
+    if size > MAX_FILE_SIZE:
+        raise ValidationError(
+            f"File exceeds {MAX_FILE_SIZE} byte limit."
+        )
+
+    return path
+
+
+def serializable_context(ctx: dict) -> dict:
+    """
+    Audit-safe context.
+
+    Never serialize raw bytes, full embeddings, credentials,
+    or potentially sensitive source text.
+    """
+
+    safe = {}
+
+    for key, value in ctx.items():
+        if key in {
+            "file_bytes",
+            "text",
+            "embedding",
+            "embedding_vector",
+            "credentials",
+            "password",
+            "token",
+        }:
+            continue
+
+        if isinstance(value, bytes):
+            continue
+
+        if key == "entities":
+            safe[key] = value[:500]
+            continue
+
+        safe[key] = safe_json(value)
+
+    return safe
+
+
+# ============================================================
+# AUDIT STORE
+# ============================================================
+
+class AuditStore:
+
+    def __init__(self):
+        self.sqlite_path = DATA_DIR / "audit.sqlite3"
+        self.mongo_client = None
+        self.mongo_collection = None
+
+        self.connection = sqlite3.connect(self.sqlite_path)
+        self.connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS audit_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_id TEXT UNIQUE NOT NULL,
+                timestamp TEXT NOT NULL,
+                run_id TEXT NOT NULL,
+                event TEXT NOT NULL,
+                payload TEXT NOT NULL
+            )
+            """
+        )
+        self.connection.commit()
+
+    async def connect(self):
+        if not MONGODB_URI:
+            log.info("MongoDB not configured; using SQLite audit.")
+            return
+
+        try:
+            from motor.motor_asyncio import (
+                AsyncIOMotorClient,
+            )
+
+            self.mongo_client = AsyncIOMotorClient(
+                MONGODB_URI,
+                serverSelectionTimeoutMS=3000,
+            )
+
+            await self.mongo_client.admin.command("ping")
+
+            self.mongo_collection = (
+                self.mongo_client[MONGODB_DATABASE][
+                    MONGODB_COLLECTION
+                ]
+            )
+
+            log.info("MongoDB audit connected.")
+
+        except Exception as exc:
+            self.mongo_client = None
+            self.mongo_collection = None
+
+            log.warning(
+                "MongoDB unavailable; SQLite audit remains active: %s",
+                exc,
+            )
+
+    async def record(
+        self,
+        run_id: str,
+        event: str,
+        payload: dict | None = None,
+    ):
+        record = {
+            "event_id": str(uuid.uuid4()),
+            "timestamp": utc_now(),
+            "run_id": run_id,
+            "event": event,
+            "payload": safe_json(payload or {}),
+        }
+
+        self.connection.execute(
+            """
+            INSERT INTO audit_log
+            (event_id, timestamp, run_id, event, payload)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                record["event_id"],
+                record["timestamp"],
+                record["run_id"],
+                record["event"],
+                json.dumps(record["payload"]),
+            ),
+        )
+
+        self.connection.commit()
+
+        if self.mongo_collection is not None:
+            await self.mongo_collection.insert_one(record)
+
+        log.info("AUDIT %s", event)
+
+    def close(self):
+        self.connection.close()
+
+        if self.mongo_client is not None:
+            self.mongo_client.close()
+
+
+# ============================================================
+# HTTP CLIENT
+# ============================================================
+
+class HTTP:
+
+    def __init__(self):
+        self.session = None
+
+    async def __aenter__(self):
+        timeout = aiohttp.ClientTimeout(total=HTTP_TIMEOUT)
+
+        self.session = aiohttp.ClientSession(
+            timeout=timeout,
+        )
+
+        return self
+
+    async def __aexit__(self, *args):
+        await self.session.close()
+
+    async def post(self, url: str, payload: dict):
+        try:
+            async with self.session.post(
+                url,
+                json=payload,
+            ) as response:
+
+                body = await response.text()
+
+                if response.status >= 400:
+                    raise ServiceError(
+                        f"{url} returned HTTP {response.status}: "
+                        f"{body[:1000]}"
+                    )
+
+                try:
+                    return json.loads(body)
+                except json.JSONDecodeError:
+                    raise ServiceError(
+                        f"{url} returned invalid JSON."
+                    )
+
+        except aiohttp.ClientError as exc:
+            raise ServiceError(
+                f"Cannot reach {url}: {exc}"
+            ) from exc
+
+
+# ============================================================
+# PIPELINE
+# ============================================================
+
+class MasterPipeline:
+
+    def __init__(
+        self,
+        audit: AuditStore,
+        http: HTTP,
+        enable_simulator: bool = False,
+    ):
+        self.audit = audit
+        self.http = http
+        self.enable_simulator = enable_simulator
+
+        self.run_id = str(uuid.uuid4())
+
+    async def stage(self, name: str, function, ctx):
+        started = time.monotonic()
+
+        await self.audit.record(
+            self.run_id,
+            f"{name}.started",
+        )
+
+        try:
+            result = await function(ctx)
+
+            elapsed = round(
+                time.monotonic() - started,
+                3,
+            )
+
+            await self.audit.record(
+                self.run_id,
+                f"{name}.completed",
+                {
+                    "elapsed_seconds": elapsed,
+                    "context": serializable_context(result),
+                },
+            )
+
+            return result
+
+        except Exception as exc:
+            await self.audit.record(
+                self.run_id,
+                f"{name}.failed",
+                {
+                    "error": str(exc),
+                    "error_type": type(exc).__name__,
+                },
+            )
+
+            raise
+
+    # --------------------------------------------------------
+    # 1. INGEST
+    # --------------------------------------------------------
+
+    async def ingest(self, ctx):
+        path = ctx["source_path"]
+
+        destination = (
+            UPLOAD_DIR /
+            f"{uuid.uuid4().hex}_{safe_filename(path.name)}"
+        )
+
+        destination.write_bytes(path.read_bytes())
+
+        ctx["stored_file"] = str(destination)
+        ctx["file_name"] = path.name
+        ctx["file_size"] = destination.stat().st_size
+        ctx["sha256"] = sha256_file(destination)
+
+        extension = destination.suffix.lower()
+
+        if extension in {".txt", ".md", ".csv", ".json"}:
+            text = destination.read_text(
+                encoding="utf-8",
+                errors="replace",
+            )
+
+        elif extension == ".pdf":
+            from pypdf import PdfReader
+
+            reader = PdfReader(str(destination))
+
+            text = "\n".join(
+                page.extract_text() or ""
+                for page in reader.pages
+            )
+
+        elif extension == ".docx":
+            from docx import Document
+
+            document = Document(str(destination))
+
+            text = "\n".join(
+                paragraph.text
+                for paragraph in document.paragraphs
+            )
+
+        else:
+            raise ValidationError(
+                f"No parser implemented for {extension}"
+            )
+
+        if not text.strip():
+            raise ValidationError(
+                "No extractable text found in input file."
+            )
+
+        if len(text) > MAX_TEXT_LENGTH:
+            raise ValidationError(
+                "Extracted text exceeds configured limit."
+            )
+
+        ctx["text"] = text
+
+        return ctx
+
+    # --------------------------------------------------------
+    # 2. LANGUAGE DETECTION
+    # --------------------------------------------------------
+
+    async def detect_language(self, ctx):
+        from langdetect import detect
+
+        ctx["language"] = detect(ctx["text"])
+
+        return ctx
+
+    # --------------------------------------------------------
+    # 3. NLP EXTRACTION
+    # --------------------------------------------------------
+
+    async def extract_entities(self, ctx):
+        """
+        Lightweight multilingual-safe baseline.
+
+        This is not a substitute for a configured multilingual
+        NER model. It extracts candidate terms only.
+        """
+
+        text = ctx["text"]
+
+        words = re.findall(
+            r"\b[A-Z][a-zA-Z'-]{2,}\b",
+            text,
+        )
+
+        ctx["entities"] = [
+            {
+                "text": word,
+                "type": "candidate_proper_noun",
+            }
+            for word in sorted(set(words))[:500]
+        ]
+
+        ctx["entity_extraction_method"] = (
+            "candidate_proper_noun_baseline"
+        )
+
+        return ctx
+
+    # --------------------------------------------------------
+    # 4. LOCAL EMBEDDINGS
+    # --------------------------------------------------------
+
+    async def embed_text(self, ctx):
+        text = ctx["text"]
+
+        async with self.http.session.post(
+            f"{OLLAMA_ENDPOINT}/api/embed",
+            json={
+                "model": OLLAMA_MODEL,
+                "input": text[:MAX_TEXT_LENGTH],
+            },
+        ) as response:
+
+            body = await response.text()
+
+            if response.status >= 400:
+                raise ServiceError(
+                    f"Ollama embedding failed: {body[:1000]}"
+                )
+
+            result = json.loads(body)
+
+        embeddings = result.get("embeddings")
+
+        if not embeddings or not embeddings[0]:
+            raise ServiceError(
+                "Ollama returned no embedding vector."
+            )
+
+        vector = embeddings[0]
+
+        if not all(
+            isinstance(value, (int, float))
+            for value in vector
+        ):
+            raise ServiceError(
+                "Embedding contains invalid values."
+            )
+
+        ctx["embedding"] = vector
+        ctx["embedding_dimensions"] = len(vector)
+        ctx["embedding_model"] = OLLAMA_MODEL
+
+        return ctx
+
+    # --------------------------------------------------------
+    # 5. KNOWLEDGE GRAPH
+    # --------------------------------------------------------
+
+    async def link_graph(self, ctx):
+        graph_path = DATA_DIR / "knowledge_graph.sqlite3"
+
+        connection = sqlite3.connect(graph_path)
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS entities (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                entity_text TEXT NOT NULL,
+                entity_type TEXT NOT NULL,
+                source_hash TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                UNIQUE(entity_text, entity_type, source_hash)
+            )
+            """
+        )
+
+        for entity in ctx["entities"]:
+            connection.execute(
+                """
+                INSERT OR IGNORE INTO entities
+                (entity_text, entity_type, source_hash, created_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    entity["text"],
+                    entity["type"],
+                    ctx["sha256"],
+                    utc_now(),
+                ),
+            )
+
+        connection.commit()
+        connection.close()
+
+        ctx["graph_entities_saved"] = len(ctx["entities"])
+
+        return ctx
+
+    # --------------------------------------------------------
+    # 6. POLICY PLANNING
+    # --------------------------------------------------------
+
+    async def plan_policy(self, ctx):
+        response = await self.http.post(
+            f"{POLICY_ENDPOINT}/plan",
+            {
+                "run_id": self.run_id,
+                "state": {
+                    "language": ctx["language"],
+                    "embedding_dimensions": (
+                        ctx["embedding_dimensions"]
+                    ),
+                    "entity_count": len(ctx["entities"]),
+                },
+                "mode": "simulation_only",
+            },
+        )
+
+        action = response.get("action")
+
+        if not isinstance(action, dict):
+            raise ServiceError(
+                "Policy service did not return an action object."
+            )
+
+        ctx["action"] = action
+
+        return ctx
+
+    # --------------------------------------------------------
+    # 7. SIMULATION
+    # --------------------------------------------------------
+
+    async def execute_simulation(self, ctx):
+        if not self.enable_simulator:
+            ctx["execution"] = {
+                "status": "skipped",
+                "reason": "Simulator not explicitly enabled.",
+            }
+
+            return ctx
+
+        response = await self.http.post(
+            f"{SIMULATOR_ENDPOINT}/simulate",
+            {
+                "run_id": self.run_id,
+                "action": ctx["action"],
+                "mode": "isolated_simulation",
+                "physical_execution": False,
+            },
+        )
+
+        if response.get("status") not in {
+            "completed",
+            "success",
+        }:
+            raise ServiceError(
+                "Simulator did not confirm successful completion."
+            )
+
+        metrics = response.get("metrics")
+
+        if not isinstance(metrics, dict):
+            raise ServiceError(
+                "Simulator returned no metrics."
+            )
+
+        required = {
+            "yield",
+            "toxicity",
+            "cost",
+        }
+
+        if not required.issubset(metrics):
+            raise ServiceError(
+                "Simulator metrics are incomplete."
+            )
+
+        for key in required:
+            value = metrics[key]
+
+            if not isinstance(value, (int, float)):
+                raise ServiceError(
+                    f"Invalid simulation metric: {key}"
+                )
+
+            if not float("-inf") < value < float("inf"):
+                raise ServiceError(
+                    f"Non-finite simulation metric: {key}"
+                )
+
+        ctx["execution"] = response
+
+        return ctx
+
+    # --------------------------------------------------------
+    # 8. EVALUATION
+    # --------------------------------------------------------
+
+    async def evaluate(self, ctx):
+        execution = ctx.get("execution", {})
+
+        if execution.get("status") == "skipped":
+            ctx["evaluation"] = {
+                "status": "not_evaluated",
+                "reason": "No simulator result available.",
+            }
+
+            return ctx
+
+        metrics = execution["metrics"]
+
+        reward = (
+            float(metrics["yield"])
+            - 0.1 * float(metrics["toxicity"])
+            - 0.05 * float(metrics["cost"])
+        )
+
+        ctx["evaluation"] = {
+            "status": "evaluated",
+            "reward": reward,
+            "metrics": metrics,
+        }
+
+        return ctx
+
+    # --------------------------------------------------------
+    # 9. POLICY UPDATE
+    # --------------------------------------------------------
+
+    async def update_policy(self, ctx):
+        if ctx["evaluation"]["status"] != "evaluated":
+            ctx["policy_update"] = {
+                "status": "skipped",
+            }
+
+            return ctx
+
+        response = await self.http.post(
+            f"{POLICY_ENDPOINT}/update",
+            {
+                "run_id": self.run_id,
+                "state": {
+                    "language": ctx["language"],
+                    "embedding_dimensions": (
+                        ctx["embedding_dimensions"]
+                    ),
+                },
+                "action": ctx["action"],
+                "reward": ctx["evaluation"]["reward"],
+            },
+        )
+
+        ctx["policy_update"] = response
+
+        return ctx
+
+    # --------------------------------------------------------
+    # 10. PROTOCOL LOCK
+    # --------------------------------------------------------
+
+    async def lock_protocol(self, ctx):
+        update = ctx.get("policy_update", {})
+
+        if (
+            ctx["evaluation"]["status"] != "evaluated"
+            or update.get("is_best") is not True
+        ):
+            ctx["lock"] = {
+                "status": "not_locked",
+                "reason": "No verified best-policy result.",
+            }
+
+            return ctx
+
+        response = await self.http.post(
+            f"{POLICY_ENDPOINT}/lock",
+            {
+                "run_id": self.run_id,
+                "action": ctx["action"],
+                "metrics": ctx["evaluation"]["metrics"],
+                "reward": ctx["evaluation"]["reward"],
+                "physical_execution": False,
+            },
+        )
+
+        if response.get("status") not in {
+            "locked",
+            "success",
+        }:
+            raise ServiceError(
+                "Policy service did not confirm protocol lock."
+            )
+
+        ctx["lock"] = response
+
+        return ctx
+
+    # --------------------------------------------------------
+    # 11. REPORT
+    # --------------------------------------------------------
+
+    async def generate_report(self, ctx):
+        report = {
+            "run_id": self.run_id,
+            "generated_at": utc_now(),
+            "source": {
+                "file_name": ctx["file_name"],
+                "sha256": ctx["sha256"],
+                "file_size": ctx["file_size"],
+            },
+            "language": ctx.get("language"),
+            "entity_count": len(ctx.get("entities", [])),
+            "embedding": {
+                "model": ctx.get("embedding_model"),
+                "dimensions": ctx.get(
+                    "embedding_dimensions"
+                ),
+            },
+            "policy_action": ctx.get("action"),
+            "execution": ctx.get("execution"),
+            "evaluation": ctx.get("evaluation"),
+            "policy_update": ctx.get("policy_update"),
+            "lock": ctx.get("lock"),
+            "physical_execution": False,
+        }
+
+        report_path = (
+            REPORT_DIR /
+            f"report_{self.run_id}.json"
+        )
+
+        report_path.write_text(
+            json.dumps(
+                report,
+                indent=2,
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+
+        ctx["report_path"] = str(report_path)
+
+        return ctx
+
+    # --------------------------------------------------------
+    # COMPLETE PIPELINE
+    # --------------------------------------------------------
+
+    async def run(self, source_path: Path):
+        ctx = {
+            "run_id": self.run_id,
+            "source_path": source_path,
+        }
+
+        await self.audit.record(
+            self.run_id,
+            "pipeline.started",
+            {
+                "file": source_path.name,
+                "simulator_enabled": self.enable_simulator,
+            },
+        )
+
+        stages = [
+            ("ingest", self.ingest),
+            ("language_detection", self.detect_language),
+            ("nlp_extraction", self.extract_entities),
+            ("local_embedding", self.embed_text),
+            ("knowledge_graph", self.link_graph),
+            ("policy_planning", self.plan_policy),
+            ("simulation", self.execute_simulation),
+            ("evaluation", self.evaluate),
+            ("policy_update", self.update_policy),
+            ("protocol_lock", self.lock_protocol),
+            ("report", self.generate_report),
+        ]
+
+        try:
+            for name, function in stages:
+                ctx = await self.stage(
+                    name,
+                    function,
+                    ctx,
+                )
+
+            await self.audit.record(
+                self.run_id,
+                "pipeline.completed",
+                {
+                    "report": ctx["report_path"],
+                    "lock": ctx.get("lock"),
+                },
+            )
+
+            return ctx
+
+        except Exception as exc:
+            await self.audit.record(
+                self.run_id,
+                "pipeline.failed",
+                {
+                    "error": str(exc),
+                    "error_type": type(exc).__name__,
+                },
+            )
+
+            raise
+
+
+# ============================================================
+# PLAYWRIGHT UI AUDIT
+# ============================================================
+
+async def run_ui_audit(audit: AuditStore, run_id: str):
+    """
+    Safe UI audit.
+
+    Only buttons explicitly marked with:
+        data-testid="safe-ui-test"
+
+    are clicked.
+
+    Destructive, payment, delete, submit, and unmarked buttons
+    are not automatically activated.
+    """
+
+    try:
+        from playwright.async_api import async_playwright
+
+    except ImportError:
+        raise PipelineError(
+            "Playwright is not installed."
+        )
+
+    results = []
+
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(
+            headless=True,
+        )
+
+        page = await browser.new_page()
+
+        try:
+            response = await page.goto(
+                REACT_URL,
+                wait_until="domcontentloaded",
+                timeout=30000,
+            )
+
+            if response is None or response.status >= 400:
+                raise PipelineError(
+                    "React application did not load successfully."
+                )
+
+            buttons = page.locator(
+                'button[data-testid="safe-ui-test"]'
+            )
+
+            count = await buttons.count()
+
+            for index in range(count):
+                button = buttons.nth(index)
+
+                label = (
+                    await button.inner_text()
+                ).strip()
+
+                result = {
+                    "index": index + 1,
+                    "label": label,
+                }
+
+                try:
+                    if not await button.is_visible():
+                        result["status"] = "SKIPPED_NOT_VISIBLE"
+
+                    elif not await button.is_enabled():
+                        result["status"] = "SKIPPED_DISABLED"
+
+                    else:
+                        await button.click(
+                            timeout=5000,
+                        )
+
+                        result["status"] = "CLICKED"
+
+                except Exception as exc:
+                    result["status"] = "FAILED"
+                    result["error"] = str(exc)
+
+                results.append(result)
+
+                await audit.record(
+                    run_id,
+                    "ui_button_test",
+                    result,
+                )
+
+            await audit.record(
+                run_id,
+                "ui_audit.completed",
+                {
+                    "url": REACT_URL,
+                    "buttons_found": count,
+                    "results": results,
+                },
+            )
+
+        finally:
+            await browser.close()
+
+    return results
+
+
+# ============================================================
+# CLI
+# ============================================================
+
+async def main():
+    parser = argparse.ArgumentParser(
+        description="Local-first master pipeline orchestrator."
+    )
+
+    parser.add_argument(
+        "file",
+        type=Path,
+        help="PDF, DOCX, TXT, MD, CSV, or JSON input.",
+    )
+
+    parser.add_argument(
+        "--enable-simulator",
+        action="store_true",
+        help="Allow calls to the configured isolated simulator.",
+    )
+
+    parser.add_argument(
+        "--test-ui",
+        action="store_true",
+        help="Run safe Playwright UI audit.",
+    )
+
+    args = parser.parse_args()
+
+    audit = AuditStore()
+
+    try:
+        source_path = validate_file(args.file)
+
+        await audit.connect()
+
+        async with HTTP() as http:
+            pipeline = MasterPipeline(
+                audit=audit,
+                http=http,
+                enable_simulator=args.enable_simulator,
+            )
+
+            result = await pipeline.run(source_path)
+
+        if args.test_ui:
+            await run_ui_audit(
+                audit,
+                result["run_id"],
+            )
+
+        print(
+            json.dumps(
+                {
+                    "status": "COMPLETED",
+                    "run_id": result["run_id"],
+                    "report": result["report_path"],
+                    "audit_database": str(
+                        audit.sqlite_path
+                    ),
+                    "simulator_enabled": (
+                        args.enable_simulator
+                    ),
+                    "physical_execution": False,
+                },
+                indent=2,
+            )
+        )
+
+    except Exception as exc:
+        log.exception("Pipeline failed.")
+
+        print(
+            json.dumps(
+                {
+                    "status": "FAILED",
+                    "error": str(exc),
+                    "physical_execution": False,
+                },
+                indent=2,
+            ),
+            file=sys.stderr,
+        )
+
+        raise SystemExit(1)
+
+    finally:
+        audit.close()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

@@ -1,0 +1,1606 @@
+INTEL/
+├── frontend/
+│   ├── package.json
+│   ├── index.html
+│   ├── vite.config.ts
+│   ├── tsconfig.json
+│   ├── public/
+│   │   └── assets/
+│   │       ├── logo.svg
+│   │       ├── bg-stars.svg
+│   │       └── particle-tex.svg
+│   └── src/
+│       ├── main.tsx
+│       ├── App.tsx
+│       ├── styles/
+│       │   ├── global.css
+│       │   └── holographic.css
+│       ├── components/
+│       │   ├── Header.tsx
+│       │   ├── CommandCenter.tsx
+│       │   ├── ResearchInput.tsx
+│       │   ├── VoiceControl.tsx
+│       │   ├── HologramCanvas.tsx
+│       │   ├── DataMesh.tsx
+│       │   ├── ParticleField.tsx
+│       │   ├── SimulationSphere.tsx
+│       │   ├── ControlTower.tsx
+│       │   ├── ParameterPanel.tsx
+│       │   ├── InsightPanel.tsx
+│       │   ├── ResearchAnswer.tsx
+│       │   ├── EvidencePanel.tsx
+│       │   ├── SimulationChart.tsx
+│       │   ├── ExportMenu.tsx
+│       │   ├── StatusBar.tsx
+│       │   └── LanguageSelector.tsx
+│       ├── hooks/
+│       │   ├── useResearch.ts
+│       │   ├── useVoice.ts
+│       │   ├── useSimulation.ts
+│       │   └── useLanguage.ts
+│       ├── services/
+│       │   ├── api.ts
+│       │   ├── voice.ts
+│       │   └── websocket.ts
+│       ├── i18n/
+│       │   ├── en.json
+│       │   └── he.json
+│       └── types/
+│           └── index.ts
+├── backend/
+│   ├── main.py
+│   ├── api/
+│   │   ├── research.py
+│   │   ├── simulation.py
+│   │   ├── voice.py
+│   │   └── health.py
+│   ├── services/
+│   │   ├── rag_service.py
+│   │   ├── llm_service.py
+│   │   ├── simulation_service.py
+│   │   └── evidence_service.py
+│   ├── schemas/
+│   │   ├── research.py
+│   │   └── simulation.py
+│   └── tests/
+├── infrastructure/
+│   ├── Dockerfile
+│   └── docker-compose.yml
+└── README.md
+
+
+
+
+{
+  "name": "intel-command-center",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@react-three/drei": "^10.0.0",
+    "@react-three/fiber": "^9.0.0",
+    "i18next": "^25.0.0",
+    "lucide-react": "^0.468.0",
+    "plotly.js": "^3.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-i18next": "^16.0.0",
+    "react-plotly.js": "^2.6.0",
+    "three": "^0.174.0",
+    "three-stdlib": "^2.35.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/three": "^0.174.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0",
+    "vitest": "^3.0.0"
+  }
+}
+
+
+
+
+// frontend/src/main.tsx
+
+import React from "react";
+import ReactDOM from "react-dom/client";
+import App from "./App";
+import "./styles/global.css";
+import "./styles/holographic.css";
+
+import "./i18n";
+
+ReactDOM.createRoot(
+  document.getElementById("root")!
+).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+
+
+
+
+// frontend/src/App.tsx
+
+import { useState } from "react";
+import Header from "./components/Header";
+import HologramCanvas from "./components/HologramCanvas";
+import ControlTower from "./components/ControlTower";
+import InsightPanel from "./components/InsightPanel";
+import StatusBar from "./components/StatusBar";
+import { useResearch } from "./hooks/useResearch";
+import { useSimulation } from "./hooks/useSimulation";
+
+export default function App() {
+
+  const research = useResearch();
+  const simulation = useSimulation();
+
+  const [language, setLanguage] = useState("en");
+
+  return (
+    <div className="intel-app" dir={language === "he" ? "rtl" : "ltr"}>
+
+      <Header
+        language={language}
+        onLanguageChange={setLanguage}
+      />
+
+      <main className="workspace">
+
+        <section className="visual-workspace">
+
+          <HologramCanvas
+            active={research.loading || simulation.running}
+            simulationProgress={simulation.progress}
+            parameters={simulation.parameters}
+          />
+
+          <ControlTower
+            loading={research.loading}
+            onSubmit={research.ask}
+            onVoiceResult={research.ask}
+            error={research.error}
+          />
+
+        </section>
+
+        <InsightPanel
+          answer={research.answer}
+          sources={research.sources}
+          loading={research.loading}
+          simulation={simulation}
+          onSimulate={simulation.run}
+        />
+
+      </main>
+
+      <StatusBar />
+
+    </div>
+  );
+}
+
+
+
+
+// frontend/src/components/Header.tsx
+
+import { Globe, Mic, Share2, LogIn } from "lucide-react";
+
+interface Props {
+  language: string;
+  onLanguageChange: (language: string) => void;
+}
+
+export default function Header({
+  language,
+  onLanguageChange
+}: Props) {
+
+  return (
+    <header className="intel-header">
+
+      <div className="brand">
+        <div className="brand-symbol">✧</div>
+        <div>
+          <h1>אינטל</h1>
+          <span>INTEL RESEARCH INTELLIGENCE</span>
+        </div>
+      </div>
+
+      <div className="brand-tagline">
+        משולב, מדויק, מציאות דיגיטלית.
+      </div>
+
+      <div className="header-actions">
+
+        <button className="icon-button" title="Sign in">
+          <LogIn />
+          <span>Sign in</span>
+        </button>
+
+        <button className="icon-button" title="Share">
+          <Share2 />
+        </button>
+
+        <button className="icon-button" title="Language">
+          <Globe />
+          <select
+            value={language}
+            onChange={event => onLanguageChange(event.target.value)}
+          >
+            <option value="en">English</option>
+            <option value="he">עברית</option>
+          </select>
+        </button>
+
+      </div>
+
+    </header>
+  );
+}
+
+
+
+
+// frontend/src/components/HologramCanvas.tsx
+
+import { Canvas } from "@react-three/fiber";
+import { OrbitControls, Stars, Float } from "@react-three/drei";
+import DataMesh from "./DataMesh";
+import ParticleField from "./ParticleField";
+import SimulationSphere from "./SimulationSphere";
+
+interface Props {
+  active: boolean;
+  simulationProgress: number;
+  parameters: Record<string, number>;
+}
+
+export default function HologramCanvas({
+  active,
+  simulationProgress,
+  parameters
+}: Props) {
+
+  return (
+    <div className="hologram-container">
+
+      <div className="canvas-label">
+        <span className={active ? "live-indicator active" : "live-indicator"} />
+        HOLOGRAPHIC RESEARCH ENVIRONMENT
+      </div>
+
+      <Canvas
+        camera={{ position: [0, 0, 8], fov: 50 }}
+        dpr={[1, 1.5]}
+        gl={{ antialias: true, alpha: true }}
+      >
+
+        <ambientLight intensity={0.25} />
+
+        <pointLight
+          position={[5, 5, 5]}
+          intensity={2}
+          color="#05B6E0"
+        />
+
+        <pointLight
+          position={[-5, -5, -3]}
+          intensity={1}
+          color="#1FE4F4"
+        />
+
+        <Stars
+          radius={80}
+          depth={50}
+          count={1200}
+          factor={3}
+          fade
+        />
+
+        <ParticleField active={active} />
+
+        <Float speed={active ? 2 : 0.5}>
+          <DataMesh active={active} />
+        </Float>
+
+        <SimulationSphere
+          progress={simulationProgress}
+          parameters={parameters}
+        />
+
+        <OrbitControls
+          enablePan
+          enableZoom
+          minDistance={3}
+          maxDistance={18}
+        />
+
+      </Canvas>
+
+      <div className="canvas-overlay">
+        <span>INTEL / SPATIAL CORE</span>
+        <span>3D ENGINE ONLINE</span>
+      </div>
+
+    </div>
+  );
+}
+
+
+
+
+// frontend/src/components/DataMesh.tsx
+
+import { useRef } from "react";
+import { useFrame } from "@react-three/fiber";
+import * as THREE from "three";
+
+export default function DataMesh({ active }: { active: boolean }) {
+
+  const mesh = useRef<THREE.Mesh>(null);
+
+  useFrame((state, delta) => {
+
+    if (!mesh.current) return;
+
+    mesh.current.rotation.x += delta * 0.12;
+    mesh.current.rotation.y += delta * (active ? 0.7 : 0.2);
+  });
+
+  return (
+
+    <group>
+
+      <mesh ref={mesh}>
+
+        <torusKnotGeometry args={[1.5, 0.035, 180, 12, 2, 3]} />
+
+        <meshStandardMaterial
+          color="#05B6E0"
+          emissive="#05B6E0"
+          emissiveIntensity={active ? 3 : 0.8}
+          wireframe
+        />
+
+      </mesh>
+
+      <mesh>
+        <icosahedronGeometry args={[0.65, 2]} />
+        <meshBasicMaterial
+          color="#1FE4F4"
+          wireframe
+          transparent
+          opacity={0.3}
+        />
+      </mesh>
+
+      {[0, 1, 2, 3, 4, 5].map(index => {
+
+        const angle = index * Math.PI / 3;
+
+        return (
+          <mesh
+            key={index}
+            position={[
+              Math.cos(angle) * 2.5,
+              Math.sin(angle) * 2.5,
+              0
+            ]}
+          >
+            <sphereGeometry args={[0.06, 16, 16]} />
+            <meshBasicMaterial color="#1FE4F4" />
+          </mesh>
+        );
+      })}
+
+    </group>
+  );
+}
+
+
+
+
+// frontend/src/components/ParticleField.tsx
+
+import { useMemo } from "react";
+import * as THREE from "three";
+import { useFrame } from "@react-three/fiber";
+import { useRef } from "react";
+
+export default function ParticleField({
+  active
+}: {
+  active: boolean;
+}) {
+
+  const points = useRef<THREE.Points>(null);
+
+  const positions = useMemo(() => {
+
+    const values = new Float32Array(900);
+
+    for (let i = 0; i < values.length; i++) {
+      values[i] = (Math.random() - 0.5) * 14;
+    }
+
+    return values;
+
+  }, []);
+
+  useFrame((_, delta) => {
+
+    if (points.current) {
+      points.current.rotation.y += delta * (active ? 0.12 : 0.025);
+    }
+
+  });
+
+  return (
+
+    <points ref={points}>
+
+      <bufferGeometry>
+        <bufferAttribute
+          attach="attributes-position"
+          args={[positions, 3]}
+        />
+      </bufferGeometry>
+
+      <pointsMaterial
+        color="#05B6E0"
+        size={0.025}
+        transparent
+        opacity={0.7}
+      />
+
+    </points>
+  );
+}
+
+
+
+
+// frontend/src/components/SimulationSphere.tsx
+
+import { useFrame } from "@react-three/fiber";
+import { useRef } from "react";
+import * as THREE from "three";
+
+interface Props {
+  progress: number;
+  parameters: Record<string, number>;
+}
+
+export default function SimulationSphere({
+  progress,
+  parameters
+}: Props) {
+
+  const sphere = useRef<THREE.Mesh>(null);
+
+  useFrame(({ clock }) => {
+
+    if (!sphere.current) return;
+
+    const pulse = 1 + Math.sin(clock.elapsedTime * 2) * 0.035;
+
+    sphere.current.scale.setScalar(
+      pulse * (1 + progress * 0.15)
+    );
+
+  });
+
+  return (
+
+    <mesh ref={sphere} position={[0, 0, -1]}>
+
+      <sphereGeometry args={[0.9, 32, 32]} />
+
+      <meshPhysicalMaterial
+        color="#05B6E0"
+        transparent
+        opacity={0.08 + progress * 0.15}
+        wireframe
+        transmission={0.8}
+        roughness={0.1}
+      />
+
+    </mesh>
+  );
+}
+
+
+
+
+// frontend/src/components/VoiceControl.tsx
+
+import { useVoice } from "../hooks/useVoice";
+import { Mic, MicOff } from "lucide-react";
+
+export default function VoiceControl({
+  onResult
+}: {
+  onResult: (text: string) => void;
+}) {
+
+  const { listening, start, supported } = useVoice(onResult);
+
+  return (
+
+    <button
+      className={`voice-button ${listening ? "recording" : ""}`}
+      onClick={start}
+      disabled={!supported}
+      title="Voice research"
+    >
+      {listening ? <MicOff /> : <Mic />}
+
+      {listening ? "Listening..." : "Speak"}
+
+    </button>
+  );
+}
+
+
+
+
+// frontend/src/hooks/useVoice.ts
+
+import { useState } from "react";
+
+interface SpeechRecognitionResult {
+  transcript: string;
+  isFinal: boolean;
+}
+
+interface RecognitionEvent {
+  results: ArrayLike<ArrayLike<SpeechRecognitionResult>>;
+}
+
+interface Recognition {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onresult: ((event: RecognitionEvent) => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+  start(): void;
+  stop(): void;
+}
+
+interface SpeechWindow extends Window {
+  SpeechRecognition?: new () => Recognition;
+  webkitSpeechRecognition?: new () => Recognition;
+}
+
+export function useVoice(onResult: (text: string) => void) {
+
+  const [listening, setListening] = useState(false);
+
+  const Constructor =
+    (window as SpeechWindow).SpeechRecognition ||
+    (window as SpeechWindow).webkitSpeechRecognition;
+
+  function start() {
+
+    if (!Constructor) return;
+
+    const recognition = new Constructor();
+
+    recognition.lang = "he-IL";
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onresult = event => {
+
+      const transcript = Array.from(event.results)
+        .map(result => result[0].transcript)
+        .join(" ");
+
+      if (transcript.trim()) onResult(transcript);
+    };
+
+    recognition.onend = () => setListening(false);
+    recognition.onerror = () => setListening(false);
+
+    setListening(true);
+    recognition.start();
+  }
+
+  return {
+    listening,
+    supported: Boolean(Constructor),
+    start
+  };
+}
+
+
+
+
+// frontend/src/components/ControlTower.tsx
+
+import { useState } from "react";
+import { Settings, Send, Sparkles } from "lucide-react";
+import VoiceControl from "./VoiceControl";
+
+interface Props {
+  loading: boolean;
+  onSubmit: (question: string) => void;
+  onVoiceResult: (text: string) => void;
+  error: string | null;
+}
+
+export default function ControlTower({
+  loading,
+  onSubmit,
+  onVoiceResult,
+  error
+}: Props) {
+
+  const [query, setQuery] = useState("");
+  const [showSettings, setShowSettings] = useState(false);
+
+  function submit() {
+
+    if (!query.trim() || loading) return;
+
+    onSubmit(query.trim());
+  }
+
+  return (
+
+    <section className="control-tower">
+
+      <div className="section-heading">
+        <Sparkles />
+        <h2>COMMAND CENTRAL</h2>
+
+        <button onClick={() => setShowSettings(!showSettings)}>
+          <Settings />
+        </button>
+      </div>
+
+      <textarea
+        value={query}
+        onChange={event => setQuery(event.target.value)}
+        onKeyDown={event => {
+          if (event.key === "Enter" && !event.shiftKey) {
+            event.preventDefault();
+            submit();
+          }
+        }}
+        placeholder="Ask anything in English or Hebrew..."
+      />
+
+      <div className="command-actions">
+
+        <VoiceControl onResult={onVoiceResult} />
+
+        <button
+          className="run-button"
+          onClick={submit}
+          disabled={loading || !query.trim()}
+        >
+          <Send />
+          {loading ? "PROCESSING..." : "RUN RESEARCH"}
+        </button>
+
+      </div>
+
+      {showSettings && (
+        <div className="settings-panel">
+          <p>Research settings</p>
+          <label>
+            Evidence depth
+            <select>
+              <option>Standard</option>
+              <option>Deep research</option>
+              <option>Comprehensive</option>
+            </select>
+          </label>
+        </div>
+      )}
+
+      {error && <p className="error-message">{error}</p>}
+
+    </section>
+  );
+}
+
+
+
+
+// frontend/src/hooks/useResearch.ts
+
+import { useState } from "react";
+import { research } from "../services/api";
+
+export function useResearch() {
+
+  const [answer, setAnswer] = useState("");
+  const [sources, setSources] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function ask(question: string) {
+
+    if (!question.trim()) return;
+
+    setLoading(true);
+    setError(null);
+    setAnswer("");
+    setSources([]);
+
+    try {
+
+      const result = await research(question);
+
+      setAnswer(result.answer);
+      setSources(result.sources || []);
+
+    } catch {
+
+      setError("Research service unavailable.");
+
+    } finally {
+
+      setLoading(false);
+    }
+  }
+
+  return {
+    answer,
+    sources,
+    loading,
+    error,
+    ask
+  };
+}
+
+
+
+
+// frontend/src/hooks/useSimulation.ts
+
+import { useState } from "react";
+
+export function useSimulation() {
+
+  const [running, setRunning] = useState(false);
+  const [progress, setProgress] = useState(0);
+
+  const [parameters, setParameters] = useState({
+    temperature: 300,
+    steps: 1000,
+    pressure: 1
+  });
+
+  async function run() {
+
+    setRunning(true);
+    setProgress(0);
+
+    try {
+
+      const response = await fetch(
+        "http://localhost:8000/api/simulation/run",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            engine: "openmm",
+            parameters,
+            steps: parameters.steps
+          })
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Simulation request failed");
+      }
+
+      const job = await response.json();
+
+      if (!job.job_id) {
+        throw new Error("Simulation service did not return a job ID");
+      }
+
+      const socket = new WebSocket(
+        `ws://localhost:8000/ws/simulations/${job.job_id}`
+      );
+
+      await new Promise<void>((resolve, reject) => {
+
+        socket.onmessage = event => {
+
+          const status = JSON.parse(event.data);
+
+          setProgress(status.progress ?? 0);
+
+          if (status.state === "completed") {
+            socket.close();
+            resolve();
+          }
+
+          if (status.state === "failed") {
+            socket.close();
+            reject(new Error("Simulation failed"));
+          }
+        };
+
+        socket.onerror = () => reject(
+          new Error("Simulation connection failed")
+        );
+      });
+
+    } finally {
+
+      setRunning(false);
+    }
+  }
+
+  return {
+    running,
+    progress,
+    parameters,
+    setParameters,
+    run
+  };
+}
+
+
+
+
+// frontend/src/components/InsightPanel.tsx
+
+import ResearchAnswer from "./ResearchAnswer";
+import EvidencePanel from "./EvidencePanel";
+import SimulationChart from "./SimulationChart";
+import { Play } from "lucide-react";
+
+interface Props {
+  answer: string;
+  sources: any[];
+  loading: boolean;
+  simulation: any;
+  onSimulate: () => void;
+}
+
+export default function InsightPanel({
+  answer,
+  sources,
+  loading,
+  simulation,
+  onSimulate
+}: Props) {
+
+  return (
+
+    <section className="insight-panel">
+
+      <div className="insight-header">
+        <h2>INTELLIGENCE & INSIGHTS</h2>
+
+        <button
+          onClick={onSimulate}
+          disabled={simulation.running}
+        >
+          <Play />
+          {simulation.running ? "SIMULATING..." : "SIMULATE"}
+        </button>
+      </div>
+
+      <div className="insight-grid">
+
+        <div className="insight-card">
+
+          <h3>RESEARCH ANALYSIS</h3>
+
+          <ResearchAnswer
+            answer={answer}
+            loading={loading}
+          />
+
+        </div>
+
+        <div className="insight-card">
+
+          <h3>SIMULATION OUTPUT</h3>
+
+          <SimulationChart
+            progress={simulation.progress}
+          />
+
+        </div>
+
+      </div>
+
+      <EvidencePanel sources={sources} />
+
+    </section>
+  );
+}
+
+
+
+
+// frontend/src/components/ResearchAnswer.tsx
+
+import { LoaderCircle } from "lucide-react";
+
+export default function ResearchAnswer({
+  answer,
+  loading
+}: {
+  answer: string;
+  loading: boolean;
+}) {
+
+  if (loading) {
+    return (
+      <div className="loading-state">
+        <LoaderCircle className="spinner" />
+        Analyzing research evidence...
+      </div>
+    );
+  }
+
+  return (
+    <article className="research-answer">
+      {answer || "Your research findings will appear here."}
+    </article>
+  );
+}
+
+
+
+
+// frontend/src/components/EvidencePanel.tsx
+
+export default function EvidencePanel({
+  sources
+}: {
+  sources: any[];
+}) {
+
+  return (
+
+    <section className="evidence-panel">
+
+      <h3>SUPPORTING EVIDENCE</h3>
+
+      {sources.map((source, index) => (
+
+        <article key={source.id ?? index} className="evidence-item">
+
+          <div>
+            <strong>{source.title || "Research document"}</strong>
+            <p>{source.text?.slice(0, 300)}</p>
+          </div>
+
+          {source.source_url && (
+            <a
+              href={source.source_url}
+              target="_blank"
+              rel="noreferrer"
+            >
+              View original
+            </a>
+          )}
+
+        </article>
+
+      ))}
+
+      {sources.length === 0 && (
+        <p>No supporting documents retrieved.</p>
+      )}
+
+    </section>
+  );
+}
+
+
+
+
+// frontend/src/components/SimulationChart.tsx
+
+import Plot from "react-plotly.js";
+
+export default function SimulationChart({
+  progress
+}: {
+  progress: number;
+}) {
+
+  return (
+
+    <Plot
+      data={[
+        {
+          x: [0, 1, 2, 3, 4, 5],
+          y: [0, progress * 0.2, progress * 0.4,
+              progress * 0.6, progress * 0.8, progress],
+          type: "scatter",
+          mode: "lines+markers",
+          name: "Simulation progress"
+        }
+      ]}
+      layout={{
+        autosize: true,
+        height: 240,
+        paper_bgcolor: "rgba(0,0,0,0)",
+        plot_bgcolor: "rgba(0,0,0,0)",
+        font: { color: "#BBBBBB" },
+        xaxis: { title: { text: "Simulation stage" } },
+        yaxis: { title: { text: "Progress (%)" }, range: [0, 100] },
+        margin: { l: 45, r: 15, t: 15, b: 45 }
+      }}
+      config={{
+        responsive: true,
+        displayModeBar: false
+      }}
+      style={{ width: "100%" }}
+    />
+  );
+}
+
+
+
+
+// frontend/src/components/StatusBar.tsx
+
+import { Activity, Database, Cpu } from "lucide-react";
+
+export default function StatusBar() {
+
+  return (
+
+    <footer className="status-bar">
+
+      <span><Activity /> INTEL INTERFACE ONLINE</span>
+      <span><Database /> RESEARCH CONNECTION: API CHECK REQUIRED</span>
+      <span><Cpu /> 3D ENGINE READY</span>
+
+    </footer>
+  );
+}
+
+
+
+
+/* frontend/src/styles/global.css */
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+
+:root {
+  font-family: Inter, sans-serif;
+  color: #ffffff;
+  background: #050d20;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: #050d20;
+}
+
+button, textarea, select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+.intel-app {
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse at 50% 30%, #10254b 0%, transparent 60%),
+    #050d20;
+}
+
+.intel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 4%;
+  border-bottom: 1px solid #05b6e044;
+  background: #08152bee;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand h1 {
+  margin: 0;
+  font-size: 32px;
+}
+
+.brand span {
+  font-size: 9px;
+  letter-spacing: 3px;
+  color: #05b6e0;
+}
+
+.brand-symbol {
+  font-size: 36px;
+  color: #05b6e0;
+  text-shadow: 0 0 20px #05b6e0;
+}
+
+.brand-tagline {
+  color: #a8c7df;
+  font-size: 13px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.icon-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: 1px solid #05b6e066;
+  border-radius: 8px;
+  color: white;
+  padding: 10px;
+}
+
+.icon-button select {
+  background: transparent;
+  border: none;
+  color: white;
+}
+
+.icon-button option {
+  color: black;
+}
+
+.workspace {
+  width: min(1500px, 96%);
+  margin: 25px auto;
+}
+
+.visual-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(300px, .8fr);
+  gap: 20px;
+}
+
+.hologram-container {
+  height: 500px;
+  position: relative;
+  border: 1px solid #05b6e066;
+  border-radius: 16px;
+  overflow: hidden;
+  background: radial-gradient(#102a4b, #050d20 75%);
+  box-shadow: 0 0 35px #05b6e01a;
+}
+
+.hologram-container canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.canvas-label, .canvas-overlay {
+  position: absolute;
+  z-index: 2;
+  left: 20px;
+  right: 20px;
+  display: flex;
+  justify-content: space-between;
+  color: #8bdff0;
+  font-size: 10px;
+  letter-spacing: 2px;
+  pointer-events: none;
+}
+
+.canvas-label {
+  top: 18px;
+}
+
+.canvas-overlay {
+  bottom: 18px;
+}
+
+.live-indicator {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #888;
+}
+
+.live-indicator.active {
+  background: #05e6c1;
+  box-shadow: 0 0 12px #05e6c1;
+}
+
+.control-tower, .insight-card {
+  background: #0a193eaa;
+  border: 1px solid #05b6e044;
+  border-radius: 14px;
+  padding: 20px;
+}
+
+.control-tower textarea {
+  width: 100%;
+  min-height: 180px;
+  resize: vertical;
+  color: white;
+  background: #050d20;
+  border: 1px solid #05b6e066;
+  border-radius: 9px;
+  padding: 14px;
+  outline: none;
+}
+
+.control-tower textarea:focus {
+  border-color: #1fe4f4;
+  box-shadow: 0 0 15px #05b6e033;
+}
+
+.section-heading, .command-actions, .insight-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.section-heading h2, .insight-header h2 {
+  font-size: 14px;
+  letter-spacing: 2px;
+}
+
+.section-heading svg {
+  color: #05b6e0;
+}
+
+.run-button, .insight-header button {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  border: none;
+  background: #05b6e0;
+  color: #001124;
+  padding: 12px 18px;
+  border-radius: 8px;
+  font-weight: 700;
+}
+
+.voice-button {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  background: transparent;
+  color: white;
+  border: 1px solid #05b6e066;
+  padding: 12px;
+  border-radius: 8px;
+}
+
+.voice-button.recording {
+  border-color: #ff456e;
+  color: #ff456e;
+}
+
+.insight-panel {
+  margin-top: 25px;
+}
+
+.insight-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.insight-card {
+  min-height: 280px;
+}
+
+.insight-card h3, .evidence-panel h3 {
+  color: #05b6e0;
+  font-size: 12px;
+  letter-spacing: 2px;
+}
+
+.research-answer {
+  white-space: pre-wrap;
+  line-height: 1.8;
+  color: #d5e5f5;
+}
+
+.loading-state {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  color: #05b6e0;
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+.evidence-panel {
+  margin-top: 18px;
+  padding: 20px;
+  border: 1px solid #05b6e044;
+  border-radius: 12px;
+  background: #0a193e88;
+}
+
+.evidence-item {
+  padding: 15px 0;
+  border-bottom: 1px solid #05b6e033;
+}
+
+.evidence-item p {
+  color: #aebed0;
+  line-height: 1.6;
+}
+
+.evidence-item a {
+  color: #1fe4f4;
+}
+
+.status-bar {
+  display: flex;
+  justify-content: space-around;
+  gap: 15px;
+  padding: 16px;
+  border-top: 1px solid #05b6e044;
+  color: #8bdff0;
+  font-size: 10px;
+}
+
+.status-bar span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-bar svg {
+  width: 15px;
+}
+
+.error-message {
+  color: #ff667d;
+}
+
+.settings-panel {
+  margin-top: 15px;
+  padding: 15px;
+  border: 1px solid #05b6e066;
+  border-radius: 8px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media(max-width: 850px) {
+  .visual-workspace, .insight-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hologram-container {
+    height: 400px;
+  }
+
+  .brand-tagline {
+    display: none;
+  }
+
+  .status-bar {
+    flex-direction: column;
+  }
+}
+
+
+
+
+/* frontend/src/styles/holographic.css */
+
+.hologram-container,
+.control-tower,
+.insight-card,
+.evidence-panel {
+  backdrop-filter: blur(18px);
+}
+
+.run-button:hover,
+.insight-header button:hover {
+  background: #1fe4f4;
+  box-shadow: 0 0 25px #05b6e066;
+}
+
+.icon-button:hover,
+.voice-button:hover {
+  border-color: #1fe4f4;
+  box-shadow: 0 0 15px #05b6e044;
+}
+
+.brand h1 {
+  background: linear-gradient(90deg, #ffffff, #05b6e0);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+.intel-app[dir="rtl"] .intel-header,
+.intel-app[dir="rtl"] .section-heading,
+.intel-app[dir="rtl"] .insight-header {
+  direction: rtl;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    transition-duration: .01ms !important;
+  }
+}
+
+
+
+
+// frontend/src/i18n.ts
+
+import i18n from "i18next";
+import { initReactI18next } from "react-i18next";
+
+import en from "./i18n/en.json";
+import he from "./i18n/he.json";
+
+i18n.use(initReactI18next).init({
+  resources: {
+    en: { translation: en },
+    he: { translation: he }
+  },
+  lng: "en",
+  fallbackLng: "en",
+  interpolation: {
+    escapeValue: false
+  }
+});
+
+export default i18n;
+
+
+
+
+// frontend/src/i18n/he.json
+
+{
+  "brand": "אינטל",
+  "tagline": "משולב, מדויק, מציאות דיגיטלית.",
+  "command": "מרכז הפיקוד",
+  "research": "מחקר",
+  "simulate": "הרץ סימולציה",
+  "run": "הפעל",
+  "speak": "דבר",
+  "results": "תוצאות מחקר",
+  "evidence": "מקורות מחקר",
+  "settings": "הגדרות",
+  "loading": "מנתח נתונים..."
+}
+
+
+
+
+// frontend/src/i18n/en.json
+
+{
+  "brand": "INTEL",
+  "tagline": "Integrated. Precise. Digital Reality.",
+  "command": "Command Center",
+  "research": "Research",
+  "simulate": "Run Simulation",
+  "run": "Run",
+  "speak": "Speak",
+  "results": "Research Results",
+  "evidence": "Research Sources",
+  "settings": "Settings",
+  "loading": "Analyzing data..."
+}
+
+
+
+# backend/services/simulation_service.pyimport asyncioimport uuidclass SimulationManager:    def __init__(self):        self.jobs = {}    async def submit(self, engine, parameters, steps):        job_id = str(uuid.uuid4())        self.jobs[job_id] = {            "job_id": job_id,            "state": "queued",            "progress": 0,            "engine": engine        }        asyncio.create_task(            self.execute(job_id, engine, parameters, steps)        )        return self.jobs[job_id]    async def execute(self, job_id, engine, parameters, steps):        try:            self.jobs[job_id]["state"] = "running"            if engine == "openmm":                from simulations.openmm_engine import run_openmm
+
+
+
+# backend/api/simulation.pyfrom fastapi import APIRouter, HTTPExceptionfrom pydantic import BaseModel, Fieldfrom services.simulation_service import submit_jobrouter = APIRouter()class SimulationRequest(BaseModel):    engine: str    parameters: dict    steps: int = Field(default=1000, ge=1, le=1000000)@router.post("/run")async def run_simulation(request: SimulationRequest):    if request.engine != "openmm":        raise HTTPException(400, "Unsupported simulation engine")    return await submit_job(        request.engine,        request.parameters,        request.steps    )
+
+
+
+# backend/api/websocket.pyfrom fastapi import APIRouter, WebSocket, WebSocketDisconnectfrom services.simulation_service import job_statusrouter = APIRouter()@router.websocket("/ws/simulations/{job_id}")async def simulation_updates(websocket: WebSocket, job_id: str):    await websocket.accept()    try:        while True:            try:                status = await job_status(job_id)            except KeyError:                await websocket.send_json({                    "state": "not_found",                    "progress": 0                })                break            await websocket.send_json({                "state": status["state"],                "progress": status["progress"],                "error": status.get("error")            })            if status["state"] in {"completed", "failed"}:                break            import asyncio
+
+
+
+
+# INSTALL AND START
+
+cd INTEL/frontend
+
+npm install
+
+cd ../backend
+
+python3 -m venv .venv
+source .venv/bin/activate
+
+pip install -r requirements.txt
+
+# Configure Ollama separately
+ollama list
+
+# Start backend
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+# New terminal
+cd INTEL/frontend
+npm run dev
+
+
+
+
+# FINAL ACCEPTANCE TESTS
+
+[ ] Hebrew and English interface
+[ ] Responsive desktop and mobile layout
+[ ] 3D canvas loads without WebGL errors
+[ ] Data mesh rotates and responds to interaction
+[ ] Particle field renders
+[ ] Voice recognition reports browser support
+[ ] Voice transcription reaches research API
+[ ] Research API returns real model output
+[ ] Every answer includes retrievable source references
+[ ] FAISS retrieves actual indexed research chunks
+[ ] Simulation API submits a real isolated job
+[ ] Simulation progress reflects actual execution
+[ ] WebSocket reports job state
+[ ] Charts display actual simulation output
+[ ] JSON/CSV export
+[ ] Authentication and role enforcement
+[ ] License and provenance audit
+[ ] Error handling and logging
+[ ] Automated frontend and backend tests
+[ ] Production build succeeds
