@@ -29,6 +29,7 @@ import { usePipelineCenter } from '../../hooks/usePipelineCenter';
 import { triggerFileDownload } from '../../utils/exportReport';
 import type { UserRole } from '../../types';
 import Pipeline3DCanvas from './Pipeline3DCanvas';
+import RoboticsSimulationPanel from './RoboticsSimulationPanel';
 
 export type PipelineSubRoute =
   | '/command-center'
@@ -89,6 +90,11 @@ const EXAMPLE_COMMANDS = [
     label: 'Info-Only Guard',
     mode: 'text' as const,
     text: 'What does our safety policy say about thermal drift in virtual molecular ensembles?',
+  },
+  {
+    label: 'Robotics Simulation',
+    mode: 'matrix' as const,
+    text: 'Run differential_drive robotics virtual simulation optimizing max_speed and obstacle_margin_m.',
   },
 ];
 
@@ -721,6 +727,15 @@ export default function PipelineWorkspaceHub({
               </div>
             ))}
           </div>
+
+          <RoboticsSimulationPanel
+            onLaunchInPipeline={(cmd, cfgJson) => {
+              setCommandText(cmd);
+              setInlineDataText(cfgJson);
+              setInputMode('matrix');
+              onRouteChange('/command-center');
+            }}
+          />
         </div>
       )}
 

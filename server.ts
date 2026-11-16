@@ -150,6 +150,16 @@ import {
   verifyAuditChainIntegrity,
 } from './server/commandPipeline/sqliteStore.ts';
 import { PIPELINE_STAGE_DEFINITIONS } from './server/commandPipeline/stages.ts';
+import {
+  DEFAULT_ARM_ROBOT_CONFIG,
+  DEFAULT_MOBILE_ROBOT_CONFIG,
+  DEFAULT_RESEARCH_UPLOAD_CONFIG,
+  getRoboticsPipelineManifest,
+  getSavedRoboticsRun,
+  listRoboticsConfigs,
+  listSavedRoboticsRuns,
+  runRoboticsEnginePython,
+} from './server/commandPipeline/roboticsBridge.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1977,6 +1987,52 @@ export function createApp() {
       res.json({ settings });
     }
   );
+
+  // -------------------------------------------------------------------------
+  // 15. Virtual Robotics Research Engine (robotics_engine.py bridge)
+  // -------------------------------------------------------------------------
+  app.get('/api/robotics/manifest', (_req, res) => {
+    res.json({
+      manifest: getRoboticsPipelineManifest(),
+      configs: listRoboticsConfigs(),
+    });
+  });
+
+  app.get('/api/robotics/runs', (_req, res) => {
+    res.json({
+      runs: listSavedRoboticsRuns(25),
+      presets: {
+        differential_drive: DEFAULT_MOBILE_ROBOT_CONFIG,
+        two_link_arm: DEFAULT_ARM_ROBOT_CONFIG,
+        research_upload_example: DEFAULT_RESEARCH_UPLOAD_CONFIG,
+      },
+      manifest: getRoboticsPipelineManifest(),
+      simulationOnly: true,
+    });
+  });
+
+  app.get('/api/robotics/runs/:jobId', (req, res) => {
+    const found = getSavedRoboticsRun(req.params.jobId);
+    if (!found) {
+      res.status(404).json({ error: 'Robotics run report not found.' });
+      return;
+    }
+    res.json(found);
+  });
+
+  app.post('/api/robotics/run', async (req, res) => {
+    const authReq = req as AuthenticatedRequest;
+    try {
+      const result = await runRoboticsEnginePython(
+        req.body,
+        authReq.sessionUser?.userId ?? 'research-operator'
+      );
+      res.status(201).json(result);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Robotics simulation failed.';
+      res.status(400).json({ error: msg });
+    }
+  });
 
   app.use('/api', (req, res) => {
     res.status(404).json({

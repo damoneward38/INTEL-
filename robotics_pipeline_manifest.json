@@ -1,0 +1,77 @@
+{
+  "domain": "robotics",
+  "version": "1.0.0",
+  "execution_mode": "virtual_simulation_only",
+  "pipeline": [
+    "research_ingestion",
+    "file_validation",
+    "robot_type_detection",
+    "parameter_extraction",
+    "unit_normalization",
+    "robot_model_validation",
+    "environment_model_creation",
+    "constraint_validation",
+    "simulation_plan",
+    "kinematics",
+    "dynamics",
+    "path_planning",
+    "collision_analysis",
+    "energy_analysis",
+    "replicated_simulation",
+    "measurement_collection",
+    "candidate_evaluation",
+    "optimization",
+    "repeatability_analysis",
+    "safety_review",
+    "result_validation",
+    "report_generation",
+    "audit_trail",
+    "three_dimensional_visualization"
+  ],
+  "supported_initial_models": [
+    "differential_drive",
+    "two_link_arm"
+  ],
+  "future_simulator_adapters": [
+    {
+      "name": "PyBullet",
+      "purpose": "Rigid-body physics and robot simulation",
+      "enabled": false
+    },
+    {
+      "name": "MuJoCo",
+      "purpose": "Robot dynamics and control research",
+      "enabled": false
+    },
+    {
+      "name": "ROS 2",
+      "purpose": "Robot software integration and message simulation",
+      "enabled": false
+    },
+    {
+      "name": "Gazebo",
+      "purpose": "Robotics environment simulation",
+      "enabled": false
+    },
+    {
+      "name": "MoveIt",
+      "purpose": "Robot arm motion planning",
+      "enabled": false
+    }
+  ],
+  "result_integrity": {
+    "record_actual_metrics_only": true,
+    "preserve_input_configuration": true,
+    "preserve_simulator_version": true,
+    "preserve_model_assumptions": true,
+    "record_failed_trials": true,
+    "record_simulation_events": true,
+    "never_invent_results": true
+  },
+  "hardware_execution": {
+    "enabled": false,
+    "requires_separate_hardware_integration": true,
+    "requires_human_approval": true,
+    "requires_independent_safety_validation": true
+  }
+}

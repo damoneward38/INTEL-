@@ -1,0 +1,26 @@
+{
+  "robot": {
+    "name": "Two Link Research Arm",
+    "robot_type": "two_link_arm",
+    "arm_link_1_m": 0.5,
+    "arm_link_2_m": 0.4,
+    "joint_limit_deg": 150,
+    "max_speed": 1,
+    "max_acceleration": 0.5,
+    "battery_capacity_wh": 100,
+    "payload_kg": 1
+  },
+  "simulation": {
+    "duration_s": 10,
+    "timestep_s": 0.1,
+    "trials": 1
+  },
+  "environment": {
+    "target": [0.5, 0.4]
+  },
+  "objectives": [
+    "inverse_kinematics",
+    "target_reachability",
+    "joint_limit_validation"
+  ]
+}

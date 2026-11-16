@@ -1,0 +1,6 @@
+# Virtual Robotics Research Engine (robotics_engine.py) uses Python >= 3.10 standard library only
+# (argparse, dataclasses, hashlib, json, math, pathlib, statistics, time, typing, uuid).
+# No external PyPI packages are required for core kinematic and energy simulation.
+# Optional / future physics adapters listed in robotics_pipeline_manifest.json are disabled by default:
+# - pybullet (future adapter, enabled: false)
+# - mujoco (future adapter, enabled: false)

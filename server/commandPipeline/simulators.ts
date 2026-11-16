@@ -164,6 +164,45 @@ export const SIMULATOR_ADAPTERS: SimulatorAdapterDescriptor[] = [
       'confidenceInterval95',
     ],
   },
+  {
+    id: 'robotics-kinematics-adapter',
+    name: 'Virtual Robotics Research Engine Adapter (Differential Drive & 2-DOF Arm)',
+    version: '1.0.0',
+    license: 'MIT / Virtual Simulation Only (No Physical Robot Control)',
+    supportedDomains: ['Robotics & Autonomous Kinematics', 'Autonomous Navigation & IK'],
+    supportedInputFormats: ['text', 'json-matrix', 'csv'],
+    supportedVariables: [
+      { name: 'max_speed', unit: 'm/s', min: 0.1, max: 3.5, defaultValue: 1.0 },
+      { name: 'payload_kg', unit: 'kg', min: 0.0, max: 25.0, defaultValue: 1.5 },
+      { name: 'obstacle_margin_m', unit: 'm', min: 0.05, max: 1.0, defaultValue: 0.2 },
+      { name: 'joint_limit_deg', unit: 'deg', min: 45, max: 180, defaultValue: 150.0 },
+    ],
+    parameterBounds: {
+      max_speed: [0.1, 3.5],
+      payload_kg: [0.0, 25.0],
+      obstacle_margin_m: [0.05, 1.0],
+      joint_limit_deg: [45, 180],
+    },
+    resourceRequirements: {
+      cpuCores: 1,
+      memoryMb: 256,
+      isolatedSandbox: true,
+      physicalExecution: false,
+    },
+    validationRules: [
+      'SIMULATION_ONLY = True (no physical hardware actuation permitted)',
+      'max_speed <= 3.5 m/s and obstacle_margin_m >= 0.05 m required',
+      'Battery energy consumption must stay within capacity_wh envelope',
+    ],
+    outputSchema: [
+      'stabilityScore',
+      'safetyScore',
+      'yieldScore',
+      'energyDrift',
+      'compositeScore',
+      'confidenceInterval95',
+    ],
+  },
 ];
 
 export interface SimulatorSelectionOutcome {
@@ -229,6 +268,15 @@ export function selectCompatibleSimulator(
     };
   }
 
+  if (/robotics|differential_drive|two_link_arm|wheel_radius|arm_link|inverse kinematics/i.test(lower)) {
+    const rob = SIMULATOR_ADAPTERS[4];
+    return {
+      compatible: true,
+      adapter: rob,
+      reason: `Selected ${rob.name} (${rob.version}) for virtual robotics kinematics & navigation.`,
+    };
+  }
+
   const fallback = SIMULATOR_ADAPTERS[0];
   return {
     compatible: true,
@@ -283,6 +331,82 @@ export function runVirtualReplicates(
         `Parameter "${k}"=${v} is outside simulator envelope [${minVal}, ${maxVal}].`
       );
     }
+  }
+
+  if (adapter.id === 'robotics-kinematics-adapter') {
+    const speed = candidate.parameters.max_speed ?? 1.0;
+    const payload = candidate.parameters.payload_kg ?? 1.5;
+    const marginM = candidate.parameters.obstacle_margin_m ?? 0.2;
+    const jointLimit = candidate.parameters.joint_limit_deg ?? 150.0;
+
+    const repResults: ReplicateRunResult[] = [];
+    for (let r = 0; r < replicates; r += 1) {
+      const jitter = deterministicNoise(`${candidate.candidateId}:${adapter.id}:rep:${r}`) * 0.022;
+      const speedPenalty = Math.max(0, Math.pow((speed - 1.35) / 1.8, 2));
+      const marginScore = Math.min(0.98, 0.72 + marginM * 0.65 - (payload > 15 ? 0.14 : 0));
+      const stability = Math.max(
+        0.08,
+        Math.min(0.99, 0.89 - speedPenalty * 0.45 + (jointLimit >= 120 ? 0.04 : -0.1) + jitter)
+      );
+      const safety = Math.max(0.08, Math.min(0.99, marginScore - speedPenalty * 0.55 + jitter * 0.6));
+      const yieldScore = Math.max(
+        0.1,
+        Math.min(0.99, 0.76 + Math.min(0.18, speed * 0.09) - payload * 0.008 + jitter)
+      );
+      const energyDrift = Math.max(
+        0.01,
+        Math.min(0.9, 0.04 + (speed * 0.035 + payload * 0.012) + Math.abs(jitter) * 0.4)
+      );
+      const composite = Math.max(
+        0,
+        Math.min(1, 0.4 * stability + 0.38 * safety + 0.22 * yieldScore - 0.16 * energyDrift)
+      );
+      repResults.push({
+        replicateIndex: r + 1,
+        stabilityScore: Number(stability.toFixed(4)),
+        safetyScore: Number(safety.toFixed(4)),
+        yieldScore: Number(yieldScore.toFixed(4)),
+        energyDrift: Number(energyDrift.toFixed(4)),
+        compositeScore: Number(composite.toFixed(4)),
+      });
+    }
+
+    const avg = (fn: (x: ReplicateRunResult) => number) =>
+      Number((repResults.reduce((s, x) => s + fn(x), 0) / repResults.length).toFixed(4));
+    const meanComposite = avg((x) => x.compositeScore);
+    const meanStability = avg((x) => x.stabilityScore);
+    const meanSafety = avg((x) => x.safetyScore);
+    const meanYield = avg((x) => x.yieldScore);
+    const meanDrift = avg((x) => x.energyDrift);
+
+    const variance =
+      repResults.reduce((s, x) => s + Math.pow(x.compositeScore - meanComposite, 2), 0) /
+      Math.max(1, repResults.length - 1);
+    const stdErr = Math.sqrt(variance / repResults.length);
+    const margin = Math.max(0.004, 1.96 * stdErr);
+
+    if (meanSafety < 0.72) {
+      violations.push(`Mean robotics safetyScore (${meanSafety}) fell below 0.72 collision-margin floor.`);
+    }
+    if (meanDrift > 0.25) {
+      violations.push(`Battery power draw / energyDrift (${meanDrift}) exceeded 0.25 threshold.`);
+    }
+
+    return {
+      replicates: repResults,
+      meanMetrics: {
+        stabilityScore: meanStability,
+        safetyScore: meanSafety,
+        yieldScore: meanYield,
+        energyDrift: meanDrift,
+        compositeScore: meanComposite,
+      },
+      confidenceInterval95: [
+        Number(Math.max(0, meanComposite - margin).toFixed(4)),
+        Number(Math.min(1, meanComposite + margin).toFixed(4)),
+      ],
+      constraintViolations: violations,
+    };
   }
 
   // Deterministic physical response surface anchored to thermodynamic optima

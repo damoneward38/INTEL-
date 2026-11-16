@@ -1272,6 +1272,12 @@ function buildBatch1Candidates(
 
   // Ensure at least 4 informative candidates including an aggressive stress candidate to prove real failure rejection
   if (candidates.length === 0) {
+    const primary = vars[0];
+    const span = Math.max(1e-3, primary.max - primary.min);
+    const smallStep = Number((span * 0.06).toFixed(3));
+    const medStep = Number((span * 0.12).toFixed(3));
+    const overMax = Number((primary.max + span * 0.22).toFixed(3));
+
     candidates.push(
       {
         candidateId: 'cand-b1-1',
@@ -1289,13 +1295,13 @@ function buildBatch1Candidates(
       {
         candidateId: 'cand-b1-2',
         batch: 1,
-        label: 'Candidate B1-Beta (Moderated Thermal)',
+        label: 'Candidate B1-Beta (Moderated Envelope)',
         parameters: {
           ...baseParams,
-          temperature: Number((baseParams.temperature - 8).toFixed(2)),
+          [primary.name]: Number(Math.max(primary.min, primary.defaultValue - smallStep).toFixed(3)),
         },
         status: 'pending',
-        reason: 'Lower thermal stress exploration.',
+        reason: `Conservative ${primary.name} stress exploration.`,
         replicatesCompleted: 0,
         replicatesTotal,
         metrics: null,
@@ -1305,13 +1311,13 @@ function buildBatch1Candidates(
       {
         candidateId: 'cand-b1-3',
         batch: 1,
-        label: 'Candidate B1-Gamma (Elevated Temp)',
+        label: 'Candidate B1-Gamma (Elevated Envelope)',
         parameters: {
           ...baseParams,
-          temperature: Number((baseParams.temperature + 18).toFixed(2)),
+          [primary.name]: Number(Math.min(primary.max, primary.defaultValue + medStep).toFixed(3)),
         },
         status: 'pending',
-        reason: 'Higher reaction kinetics exploration.',
+        reason: `Higher ${primary.name} kinetics/throughput exploration.`,
         replicatesCompleted: 0,
         replicatesTotal,
         metrics: null,
@@ -1324,7 +1330,7 @@ function buildBatch1Candidates(
         label: 'Candidate B1-Delta (Over-Stress Probe)',
         parameters: {
           ...baseParams,
-          temperature: Math.min(vars[0].max + 45, baseParams.temperature + 135),
+          [primary.name]: overMax,
         },
         status: 'pending',
         reason: 'Boundary stress probe testing constraint rejection.',
@@ -1347,7 +1353,9 @@ function buildRefinedBatch2(
 ): CandidateRecord[] {
   const vars = adapter.supportedVariables;
   const primary = vars[0];
-  const anchorTemp = anchor.parameters[primary.name] ?? primary.defaultValue;
+  const span = Math.max(1e-3, primary.max - primary.min);
+  const trustStep = Number((span * 0.03).toFixed(3));
+  const anchorVal = anchor.parameters[primary.name] ?? primary.defaultValue;
   const clamp = (name: string, val: number) => {
     const b = adapter.parameterBounds[name];
     if (!b) return Number(val.toFixed(3));
@@ -1361,10 +1369,10 @@ function buildRefinedBatch2(
       label: 'Candidate B2-Opt1 (Refined Core)',
       parameters: {
         ...anchor.parameters,
-        [primary.name]: clamp(primary.name, anchorTemp - 2.5),
+        [primary.name]: clamp(primary.name, anchorVal - trustStep),
       },
       status: 'pending',
-      reason: 'Adaptive trust-region refinement step (-2.5 units).',
+      reason: `Adaptive trust-region refinement step (-${trustStep} ${primary.unit}).`,
       replicatesCompleted: 0,
       replicatesTotal,
       metrics: null,
@@ -1380,7 +1388,7 @@ function buildRefinedBatch2(
         [primary.name]: clamp(primary.name, primary.defaultValue),
       },
       status: 'pending',
-      reason: 'Centered thermodynamic optimum within safety corridor.',
+      reason: 'Centered calibrated optimum within safety corridor.',
       replicatesCompleted: 0,
       replicatesTotal,
       metrics: null,

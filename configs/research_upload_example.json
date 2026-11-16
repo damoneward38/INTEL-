@@ -1,0 +1,46 @@
+{
+  "research": {
+    "title": "Mobile Robot Navigation Research",
+    "source": "Example uploaded research dataset",
+    "version": "1.0",
+    "author": "Research Contributor",
+    "description": "Evaluate a differential-drive robot navigating toward a target."
+  },
+  "robot": {
+    "name": "Uploaded Research Robot",
+    "robot_type": "differential_drive",
+    "wheel_radius": 0.05,
+    "wheel_base": 0.3,
+    "max_speed": 0.6,
+    "max_acceleration": 0.4,
+    "battery_capacity_wh": 80,
+    "payload_kg": 1
+  },
+  "simulation": {
+    "duration_s": 30,
+    "timestep_s": 0.1,
+    "trials": 10,
+    "obstacle_margin_m": 0.2,
+    "target_tolerance_m": 0.1
+  },
+  "environment": {
+    "start": [0, 0],
+    "goal": [5, 3],
+    "obstacles": [
+      {
+        "center": [2, 1],
+        "radius": 0.4
+      },
+      {
+        "center": [3, 2],
+        "radius": 0.3
+      }
+    ]
+  },
+  "objectives": [
+    "navigation",
+    "collision_avoidance",
+    "energy_efficiency",
+    "repeatability"
+  ]
+}

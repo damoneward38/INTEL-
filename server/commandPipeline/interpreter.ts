@@ -122,6 +122,9 @@ export function detectDomain(commandText: string, artifactText = ''): {
   if (/battery|reactor|thermal|catalyst|process|yield|alloy|pressure vessel/i.test(combined)) {
     return { domain: 'Chemical Process Engineering', highRiskDomain: true };
   }
+  if (/robotics|differential_drive|two_link_arm|wheel_radius|wheel_base|arm_link_1|joint_limit|inverse kinematics|obstacle_margin/i.test(combined)) {
+    return { domain: 'Robotics & Autonomous Kinematics', highRiskDomain: false };
+  }
   if (/formulat|colloid|emulsion|polymer|excipient|viscosity/i.test(combined)) {
     return { domain: 'Formulation & Stability', highRiskDomain: false };
   }
@@ -254,7 +257,7 @@ export function extractEntitiesAndGraph(
   ];
 
   const paramMatches = combined.matchAll(
-    /\b(temperature|temp|pressure|pH|ionicStrength|stabilizerPct|solventDielectric|stringency|residenceTime)\s*[:=]?\s*([0-9]+(?:\.[0-9]+)?)/gi
+    /\b(temperature|temp|pressure|pH|ionicStrength|stabilizerPct|solventDielectric|stringency|residenceTime|max_speed|payload_kg|obstacle_margin_m|arm_link_1_m|arm_link_2_m|joint_limit_deg|duration_s)\s*[:=]?\s*([0-9]+(?:\.[0-9]+)?)/gi
   );
   let idx = 0;
   for (const m of paramMatches) {
@@ -270,7 +273,7 @@ export function extractEntitiesAndGraph(
   }
 
   const compoundMatches = combined.matchAll(
-    /\b(Trehalose|Histidine|Polysorbate[-\s]?\d+|Sodium Citrate|Lipid nanoparticle|PEG-\d+|DMSO|Acetonitrile|Lennard-Jones|Water|CYP2C19\*2|TPMT\*3A)\b/gi
+    /\b(Trehalose|Histidine|Polysorbate[-\s]?\d+|Sodium Citrate|Lipid nanoparticle|PEG-\d+|DMSO|Acetonitrile|Lennard-Jones|Water|CYP2C19\*2|TPMT\*3A|differential_drive|two_link_arm|Lidar|Odometry|Inverse Kinematics)\b/gi
   );
   const seen = new Set<string>();
   for (const m of compoundMatches) {

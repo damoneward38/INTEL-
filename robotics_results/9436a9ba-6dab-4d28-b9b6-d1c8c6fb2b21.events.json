@@ -1,0 +1,86 @@
+[
+  {
+    "job_id": "9436a9ba-6dab-4d28-b9b6-d1c8c6fb2b21",
+    "sequence": 1,
+    "timestamp": 1794836913.7716734,
+    "stage": "configuration_validation",
+    "status": "running",
+    "details": {}
+  },
+  {
+    "job_id": "9436a9ba-6dab-4d28-b9b6-d1c8c6fb2b21",
+    "sequence": 2,
+    "timestamp": 1794836913.7717845,
+    "stage": "configuration_validation",
+    "status": "completed",
+    "details": {
+      "robot_type": "two_link_arm",
+      "simulation_only": true
+    }
+  },
+  {
+    "job_id": "9436a9ba-6dab-4d28-b9b6-d1c8c6fb2b21",
+    "sequence": 3,
+    "timestamp": 1794836913.7718139,
+    "stage": "simulation",
+    "status": "running",
+    "details": {
+      "robot_type": "two_link_arm",
+      "trials": 1
+    }
+  },
+  {
+    "job_id": "9436a9ba-6dab-4d28-b9b6-d1c8c6fb2b21",
+    "sequence": 4,
+    "timestamp": 1794836913.7718995,
+    "stage": "simulation_trial",
+    "status": "completed",
+    "details": {
+      "reachable": true,
+      "within_joint_limits": true,
+      "target": [
+        0.55,
+        0.45
+      ],
+      "joint_angles_deg": [
+        0.0,
+        90.0
+      ],
+      "link_lengths_m": [
+        0.55,
+        0.45
+      ],
+      "target_distance_m": 0.7106
+    }
+  },
+  {
+    "job_id": "9436a9ba-6dab-4d28-b9b6-d1c8c6fb2b21",
+    "sequence": 5,
+    "timestamp": 1794836913.7719648,
+    "stage": "simulation",
+    "status": "completed",
+    "details": {
+      "completed_trials": 1
+    }
+  },
+  {
+    "job_id": "9436a9ba-6dab-4d28-b9b6-d1c8c6fb2b21",
+    "sequence": 6,
+    "timestamp": 1794836913.7719862,
+    "stage": "evaluation",
+    "status": "running",
+    "details": {}
+  },
+  {
+    "job_id": "9436a9ba-6dab-4d28-b9b6-d1c8c6fb2b21",
+    "sequence": 7,
+    "timestamp": 1794836913.772001,
+    "stage": "evaluation",
+    "status": "completed",
+    "details": {
+      "score": 100.0,
+      "reachable": true,
+      "within_joint_limits": true
+    }
+  }
+]

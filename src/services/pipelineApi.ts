@@ -189,3 +189,114 @@ export async function fetchPipelineHealthApi(): Promise<{
 }> {
   return pipelineFetch('/api/health');
 }
+
+export interface RoboticsResearchConfig {
+  research?: {
+    title?: string;
+    source?: string;
+    version?: string;
+    author?: string;
+    description?: string;
+  };
+  robot: {
+    name: string;
+    robot_type: 'differential_drive' | 'two_link_arm';
+    wheel_radius?: number;
+    wheel_base?: number;
+    max_speed?: number;
+    max_acceleration?: number;
+    battery_capacity_wh?: number;
+    payload_kg?: number;
+    arm_link_1_m?: number;
+    arm_link_2_m?: number;
+    joint_limit_deg?: number;
+  };
+  simulation?: {
+    duration_s?: number;
+    timestep_s?: number;
+    trials?: number;
+    obstacle_margin_m?: number;
+    target_tolerance_m?: number;
+    seed?: number;
+  };
+  environment?: {
+    start?: [number, number];
+    goal?: [number, number];
+    obstacles?: Array<{ center: [number, number]; radius: number }>;
+    target?: [number, number];
+  };
+  objectives?: string[];
+}
+
+export interface RoboticsPipelineManifest {
+  domain: string;
+  version: string;
+  execution_mode: string;
+  pipeline: string[];
+  supported_initial_models: string[];
+  future_simulator_adapters: Array<{
+    name: string;
+    purpose: string;
+    enabled: boolean;
+  }>;
+  hardware_execution: {
+    enabled: boolean;
+    requires_human_approval: boolean;
+    requires_independent_safety_validation: boolean;
+  };
+}
+
+export interface RoboticsStreamEvent {
+  job_id: string;
+  sequence: number;
+  timestamp: number;
+  stage: string;
+  status: string;
+  details: Record<string, unknown>;
+}
+
+export interface RoboticsReportRecord {
+  engine_version: string;
+  job_id: string;
+  simulation_only: boolean;
+  robot: Required<RoboticsResearchConfig['robot']>;
+  simulation: Required<NonNullable<RoboticsResearchConfig['simulation']>>;
+  environment: NonNullable<RoboticsResearchConfig['environment']>;
+  trials: Array<Record<string, unknown>>;
+  evaluation: Record<string, unknown>;
+  event_count: number;
+  limitations: string[];
+  sha256: string;
+}
+
+export async function fetchRoboticsRunsApi(): Promise<{
+  runs: RoboticsReportRecord[];
+  presets: {
+    differential_drive: RoboticsResearchConfig;
+    two_link_arm: RoboticsResearchConfig;
+    research_upload_example?: RoboticsResearchConfig;
+  };
+  manifest?: RoboticsPipelineManifest;
+  simulationOnly: boolean;
+}> {
+  return pipelineFetch('/api/robotics/runs');
+}
+
+export async function fetchRoboticsManifestApi(): Promise<{
+  manifest: RoboticsPipelineManifest;
+  configs: Array<{ name: string; config: RoboticsResearchConfig }>;
+}> {
+  return pipelineFetch('/api/robotics/manifest');
+}
+
+export async function runRoboticsEngineApi(config: RoboticsResearchConfig): Promise<{
+  report: RoboticsReportRecord;
+  events: RoboticsStreamEvent[];
+  sha256Verified: boolean;
+}> {
+  return pipelineFetch('/api/robotics/run', {
+    method: 'POST',
+    body: JSON.stringify(config),
+  });
+}
+
