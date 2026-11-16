@@ -298,4 +298,87 @@ describe('All-Upload Optimizer & Enterprise Suite APIs', () => {
     expect(result.totalScore).toBeGreaterThanOrEqual(85);
     expect(result.gradeBand).toBe('Exemplary');
   });
+
+  it('enforces tier simulation quota limits without exceeding cap and persists ledger snapshot', async () => {
+    const researcherToken = await loginAs('researcher', 'RESEARCH-2026');
+
+    // Switch quota cap to Starter (max 10 simulations)
+    const setStarter = await fetch(`${baseUrl}/api/enterprise/quota`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${researcherToken}`,
+      },
+      body: JSON.stringify({ tier: 'starter' }),
+    });
+    expect(setStarter.status).toBe(200);
+    const starterBody = (await setStarter.json()) as {
+      quota: {
+        activeTier: string;
+        simulationsUsed: number;
+        simulationsMax: number;
+        simulationsRemaining: number;
+        ledgerPath: string;
+      };
+    };
+    expect(starterBody.quota.activeTier).toBe('starter');
+    expect(starterBody.quota.simulationsMax).toBe(10);
+
+    // Exhaust remaining Starter quota cleanly up to the ceiling
+    const remaining = starterBody.quota.simulationsRemaining;
+    for (let i = 0; i < remaining; i++) {
+      const okSim = await fetch(`${baseUrl}/api/simulation/run`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${researcherToken}`,
+        },
+        body: JSON.stringify({ engine: 'langevin-md', steps: 100 }),
+      });
+      expect(okSim.status).toBe(202);
+    }
+
+    // Next simulation request must stop BEFORE going past the quota limit (429)
+    const overQuotaSim = await fetch(`${baseUrl}/api/simulation/run`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${researcherToken}`,
+      },
+      body: JSON.stringify({ engine: 'langevin-md', steps: 100 }),
+    });
+    expect(overQuotaSim.status).toBe(429);
+
+    // Next autonomous closed-loop run must also stop before going past quota limit (429)
+    const overQuotaAuto = await fetch(`${baseUrl}/api/autonomous/run`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${researcherToken}`,
+      },
+      body: JSON.stringify({
+        batchSize: 4,
+        replicates: 3,
+        maxIterations: 2,
+        virtualModeConfirmed: true,
+      }),
+    });
+    expect(overQuotaAuto.status).toBe(429);
+
+    // Upgrade back to Enterprise (Unlimited) so capacity is restored
+    const setEnt = await fetch(`${baseUrl}/api/enterprise/quota`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${researcherToken}`,
+      },
+      body: JSON.stringify({ tier: 'enterprise' }),
+    });
+    expect(setEnt.status).toBe(200);
+    const entBody = (await setEnt.json()) as {
+      quota: { activeTier: string; simulationsMax: number | null };
+    };
+    expect(entBody.quota.activeTier).toBe('enterprise');
+    expect(entBody.quota.simulationsMax).toBeNull();
+  });
 });

@@ -3,6 +3,9 @@ import type {
   AllUploadPlanResponse,
   AllUploadRecord,
   AuthSession,
+  AutonomousControllerConfig,
+  AutonomousOverviewResponse,
+  AutonomousRunReport,
   AutoOptimizeExperimentRun,
   AutoOptimizeIngestedDoc,
   AutoOptimizeMeasurement,
@@ -83,12 +86,26 @@ async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
   }
 
   const res = await fetch(url, { ...init, headers });
-  const data = await res.json().catch(() => ({}));
+  const rawText = await res.text().catch(() => '');
+  let data: Record<string, unknown> = {};
+  if (rawText) {
+    try {
+      const parsed = JSON.parse(rawText);
+      if (parsed && typeof parsed === 'object') {
+        data = parsed as Record<string, unknown>;
+      }
+    } catch {
+      // Non-JSON response body handled below
+    }
+  }
   if (!res.ok) {
+    const plainSnippet = rawText.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 220);
     const errMsg =
-      typeof data?.error === 'string'
+      typeof data.error === 'string' && data.error.trim()
         ? data.error
-        : `Request failed with status ${res.status}`;
+        : typeof data.message === 'string' && data.message.trim()
+          ? data.message
+          : plainSnippet || `Request failed with status ${res.status}`;
     throw new Error(errMsg);
   }
   return data as T;
@@ -712,6 +729,55 @@ export async function submitUiButtonAuditApi(payload: {
     body: JSON.stringify(payload),
   });
 }
+
+export async function fetchAutonomousOverviewApi(): Promise<AutonomousOverviewResponse> {
+  return apiFetch('/api/autonomous/overview');
+}
+
+export async function runAutonomousControllerApi(
+  payload: Partial<AutonomousControllerConfig> & { virtualModeConfirmed: boolean }
+): Promise<{ run: AutonomousRunReport }> {
+  return apiFetch('/api/autonomous/run', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function verifyAutonomousChainApi(runId?: string): Promise<{
+  valid: boolean;
+  checkedEvents: number;
+  headRecordHash: string;
+}> {
+  const qs = runId ? `?runId=${encodeURIComponent(runId)}` : '';
+  return apiFetch(`/api/autonomous/verify${qs}`);
+}
+
+export async function updateEnterpriseQuotaTierApi(
+  tier: 'starter' | 'growth' | 'enterprise'
+): Promise<{ quota: import('../types').EnterpriseQuotaStatus }> {
+  return apiFetch('/api/enterprise/quota', {
+    method: 'POST',
+    body: JSON.stringify({ tier }),
+  });
+}
+
+export async function sendResearchChatApi(payload: {
+  message: string;
+  persona: import('../types').ResearchChatPersona;
+  language: 'en' | 'he';
+  history: import('../types').ResearchChatHistoryItem[];
+  artifactContext?: {
+    filename: string;
+    excerpt?: string;
+    summary?: string;
+  };
+}): Promise<import('../types').ResearchChatResponsePayload> {
+  return apiFetch('/api/research/chat', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
 
 
 

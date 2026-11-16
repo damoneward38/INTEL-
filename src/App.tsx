@@ -10,6 +10,7 @@ import ProvenanceView from './components/ProvenanceView';
 import AiMentorView from './components/modules/AiMentorView';
 import AllUploadView from './components/modules/AllUploadView';
 import AutoOptimizeView from './components/modules/AutoOptimizeView';
+import AutonomousControllerView from './components/modules/AutonomousControllerView';
 import EcoAuditorView from './components/modules/EcoAuditorView';
 import EnterpriseSuiteView from './components/modules/EnterpriseSuiteView';
 import GestureControlView, {
@@ -21,8 +22,13 @@ import Narrative3DView from './components/modules/Narrative3DView';
 import OpenDataMarketView from './components/modules/OpenDataMarketView';
 import OrchestratorView from './components/modules/OrchestratorView';
 import PgxVaultView from './components/modules/PgxVaultView';
+import ResearchConsoleView from './components/modules/ResearchConsoleView';
 import SandboxView from './components/modules/SandboxView';
 import ThoughtPrototypesView from './components/modules/ThoughtPrototypesView';
+import PipelineWorkspaceHub, {
+  PIPELINE_SUB_ROUTES,
+  type PipelineSubRoute,
+} from './components/pipeline/PipelineWorkspaceHub';
 import { useAuth } from './hooks/useAuth';
 import { useCorpus } from './hooks/useCorpus';
 import { useResearch } from './hooks/useResearch';
@@ -30,14 +36,33 @@ import { useSimulation } from './hooks/useSimulation';
 import { fetchEnterpriseOverviewApi } from './services/api';
 import type { WhiteLabelConfig } from './types';
 
+function resolveInitialPipelineRoute(): PipelineSubRoute | null {
+  if (typeof window === 'undefined') return null;
+  const p = window.location.pathname as PipelineSubRoute;
+  return PIPELINE_SUB_ROUTES.some((r) => r.path === p) ? p : null;
+}
+
 type KnowledgeTab = 'corpus' | 'flux' | 'narrative' | 'market';
-type LabTab = 'sandbox' | 'prototypes' | 'grants' | 'pgx' | 'optimize' | 'orchestrator';
+type LabTab =
+  | 'sandbox'
+  | 'prototypes'
+  | 'grants'
+  | 'pgx'
+  | 'optimize'
+  | 'autonomous'
+  | 'orchestrator';
 type GovernanceTab = 'provenance' | 'eco' | 'mentor' | 'gestures';
 
 export default function App() {
   const { t, i18n } = useTranslation();
   const [language, setLanguage] = useState<'en' | 'he'>('en');
-  const [activeView, setActiveView] = useState<AppView>('workspace');
+  const initialPipelineRoute = resolveInitialPipelineRoute();
+  const [activeView, setActiveView] = useState<AppView>(
+    initialPipelineRoute ? 'pipeline' : 'workspace'
+  );
+  const [pipelineRoute, setPipelineRoute] = useState<PipelineSubRoute>(
+    initialPipelineRoute ?? '/command-center'
+  );
   const [knowledgeTab, setKnowledgeTab] = useState<KnowledgeTab>('corpus');
   const [labTab, setLabTab] = useState<LabTab>('sandbox');
   const [governanceTab, setGovernanceTab] = useState<GovernanceTab>('provenance');
@@ -54,6 +79,37 @@ export default function App() {
       .then((res) => setWhiteLabel(res.whiteLabel))
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    const onPopState = () => {
+      const matched = resolveInitialPipelineRoute();
+      if (matched) {
+        setActiveView('pipeline');
+        setPipelineRoute(matched);
+      }
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  function navigatePipelineRoute(nextRoute: PipelineSubRoute) {
+    setPipelineRoute(nextRoute);
+    setActiveView('pipeline');
+    if (typeof window !== 'undefined' && window.location.pathname !== nextRoute) {
+      window.history.pushState({}, '', nextRoute);
+    }
+  }
+
+  function handleViewChange(view: AppView) {
+    setActiveView(view);
+    if (view === 'pipeline') {
+      if (typeof window !== 'undefined' && window.location.pathname !== pipelineRoute) {
+        window.history.pushState({}, '', pipelineRoute);
+      }
+    } else if (typeof window !== 'undefined' && resolveInitialPipelineRoute()) {
+      window.history.pushState({}, '', '/');
+    }
+  }
 
   useEffect(() => {
     i18n.changeLanguage(language);
@@ -94,7 +150,7 @@ export default function App() {
         language={language}
         onLanguageChange={setLanguage}
         activeView={activeView}
-        onViewChange={setActiveView}
+        onViewChange={handleViewChange}
         session={auth.session}
         onOpenAuth={() => setAuthModalOpen(true)}
         onLogout={auth.logout}
@@ -130,6 +186,7 @@ export default function App() {
                   simError={simulation.error}
                   onRunSimulation={simulation.run}
                   onCancelSimulation={simulation.cancel}
+                  onOpenConsole={() => setActiveView('console')}
                 />
               </div>
             </section>
@@ -143,6 +200,17 @@ export default function App() {
               simulationSummary={simulation.summary}
             />
           </div>
+        )}
+
+        {activeView === 'console' && <ResearchConsoleView language={language} />}
+
+        {activeView === 'pipeline' && (
+          <PipelineWorkspaceHub
+            language={language}
+            userRole={auth.session.role}
+            route={pipelineRoute}
+            onRouteChange={navigatePipelineRoute}
+          />
         )}
 
         {activeView === 'knowledge' && (
@@ -191,7 +259,15 @@ export default function App() {
           <div className="space-y-5">
             <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 pb-3">
               {(
-                ['sandbox', 'prototypes', 'grants', 'pgx', 'optimize', 'orchestrator'] as const
+                [
+                  'sandbox',
+                  'prototypes',
+                  'grants',
+                  'pgx',
+                  'optimize',
+                  'autonomous',
+                  'orchestrator',
+                ] as const
               ).map((tab) => (
                 <button
                   key={tab}
@@ -217,6 +293,12 @@ export default function App() {
             {labTab === 'pgx' && <PgxVaultView session={auth.session} />}
             {labTab === 'optimize' && (
               <AutoOptimizeView language={language} userRole={auth.session.role} />
+            )}
+            {labTab === 'autonomous' && (
+              <AutonomousControllerView
+                language={language}
+                userRole={auth.session.role}
+              />
             )}
             {labTab === 'orchestrator' && (
               <OrchestratorView

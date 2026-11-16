@@ -34,6 +34,7 @@ interface Props {
 
 const AUDIT_TARGETS: Array<{ view: AppView; subtab?: string; label: string }> = [
   { view: 'workspace', label: 'workspace' },
+  { view: 'console', label: 'console' },
   { view: 'upload', label: 'upload' },
   { view: 'knowledge', subtab: 'corpus', label: 'knowledge:corpus' },
   { view: 'knowledge', subtab: 'flux', label: 'knowledge:flux' },
@@ -44,6 +45,7 @@ const AUDIT_TARGETS: Array<{ view: AppView; subtab?: string; label: string }> = 
   { view: 'lab', subtab: 'grants', label: 'lab:grants' },
   { view: 'lab', subtab: 'pgx', label: 'lab:pgx' },
   { view: 'lab', subtab: 'optimize', label: 'lab:optimize' },
+  { view: 'lab', subtab: 'autonomous', label: 'lab:autonomous' },
   { view: 'governance', subtab: 'provenance', label: 'governance:provenance' },
   { view: 'governance', subtab: 'eco', label: 'governance:eco' },
   { view: 'governance', subtab: 'mentor', label: 'governance:mentor' },

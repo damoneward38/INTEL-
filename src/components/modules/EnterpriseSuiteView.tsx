@@ -21,6 +21,7 @@ import {
   settlePartnerPayoutApi,
   submitEnterpriseCheckoutApi,
   toggleChecklistItemApi,
+  updateEnterpriseQuotaTierApi,
   updateWhiteLabelConfigApi,
 } from '../../services/api';
 import type {
@@ -252,6 +253,26 @@ export default function EnterpriseSuiteView({
     }
   }
 
+  async function handleSwitchQuotaTier(nextTier: EnterpriseTierId) {
+    setCheckoutError(null);
+    setPayoutNotice(null);
+    try {
+      const res = await updateEnterpriseQuotaTierApi(nextTier);
+      setPayoutNotice(
+        isHe
+          ? `תקרת המכסה עודכנה לשכבת ${res.quota.activeTierName} (${res.quota.simulationsMax ?? 'ללא הגבלה'} סימולציות) ונשמרה בדיסק.`
+          : `Active quota ceiling set to ${res.quota.activeTierName} (${res.quota.simulationsMax ?? 'Unlimited'} simulations) and persisted to ${res.quota.ledgerPath}.`
+      );
+      await loadAll();
+    } catch (err) {
+      setCheckoutError(
+        err instanceof Error
+          ? err.message
+          : 'Authentication required to update active quota tier.'
+      );
+    }
+  }
+
   function downloadInvoiceMarkdown(order: EnterpriseCheckoutOrder, payout?: PartnerPayoutRecord) {
     const md = [
       `# INTEL Enterprise Commercial Invoice & Receipt`,
@@ -313,6 +334,73 @@ export default function EnterpriseSuiteView({
           </div>
         )}
       </div>
+
+      {/* Persistent Ledger & Simulation Quota Guardrail */}
+      {overview?.quota && (
+        <div className="bg-[#0D1320] border border-slate-800 rounded-xl p-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div className="space-y-1.5 min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs font-mono tabular-nums">
+              <span className="text-slate-200 font-semibold">
+                {isHe ? 'מכסת מערכת ושמירה בדיסק' : 'Active Quota Guardrail & Disk Ledger'}
+              </span>
+              <span className="text-slate-600">·</span>
+              <span className="text-cyan-300">
+                {overview.quota.activeTierName} Tier
+              </span>
+              <span className="text-slate-600">·</span>
+              <span className="text-slate-300">
+                Simulations: {overview.quota.simulationsUsed} /{' '}
+                {overview.quota.simulationsMax ?? '∞'}
+              </span>
+              <span className="text-slate-600">·</span>
+              <span className="text-slate-400">
+                Storage: {overview.quota.storageUsedMb} / {overview.quota.vectorQuotaMb} MB
+              </span>
+              <span className="text-slate-600">·</span>
+              <span className="text-emerald-400">
+                ● Saved ({overview.quota.ledgerPath})
+              </span>
+            </div>
+            <div className="w-full max-w-md h-1.5 bg-[#07090E] border border-slate-800 rounded-full overflow-hidden">
+              <div
+                className={`h-full transition-all ${
+                  overview.quota.utilizationPct >= 90
+                    ? 'bg-rose-400'
+                    : overview.quota.utilizationPct >= 75
+                      ? 'bg-amber-400'
+                      : 'bg-cyan-400'
+                }`}
+                style={{ width: `${overview.quota.utilizationPct}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {(['starter', 'growth', 'enterprise'] as const).map((tierOption) => {
+              const isCurrent = overview.quota.activeTier === tierOption;
+              return (
+                <button
+                  key={tierOption}
+                  type="button"
+                  disabled={!isAuthenticated || isCurrent}
+                  onClick={() => void handleSwitchQuotaTier(tierOption)}
+                  className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-mono transition-colors ${
+                    isCurrent
+                      ? 'border-cyan-500/50 bg-cyan-500/15 text-cyan-200'
+                      : 'border-slate-700 bg-[#07090E] text-slate-300 hover:border-slate-500 disabled:opacity-45'
+                  }`}
+                >
+                  {tierOption === 'starter'
+                    ? 'Starter (10 max)'
+                    : tierOption === 'growth'
+                      ? 'Growth (100 max)'
+                      : 'Enterprise (∞)'}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* 1. 3-Tier Pricing + Interactive Quick Quote */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-5">

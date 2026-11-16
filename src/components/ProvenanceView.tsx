@@ -49,6 +49,13 @@ export default function ProvenanceView({ userRole }: Props) {
       // Ignore
     }
 
+    if (!canVerifyLicense) {
+      setLogs([]);
+      setLogsError(t('provenance.logsRestricted'));
+      setLoading(false);
+      return;
+    }
+
     try {
       const logRes = await fetchServerLogsApi();
       setLogs(logRes.logs);

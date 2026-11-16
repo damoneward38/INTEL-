@@ -180,6 +180,34 @@ describe('Full Lifecycle E2E: Sign Up -> Research/Upload/Sim -> Checkout -> 55/4
     // Without GEMINI_API_KEY configured in test environment, research returns honest 502; with key, returns 200
     expect([200, 502]).toContain(researchRes.status);
 
+    // Voice & Chatbot Console endpoint (/api/research/chat)
+    const badChatRes = await fetch(`${baseUrl}/api/research/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: 'x', persona: 'invalid_persona' }),
+    });
+    expect(badChatRes.status).toBe(400);
+
+    const chatRes = await fetch(`${baseUrl}/api/research/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${researcherToken}`,
+      },
+      body: JSON.stringify({
+        message: 'Read through the kinetics file and suggest controls.',
+        persona: 'protocol',
+        language: 'en',
+        history: [],
+        artifactContext: {
+          filename: 'kinetics_run.csv',
+          summary: 'Completeness 65%, domain biophysics',
+          excerpt: 'step,temp,yield\n1,300,0.82\n2,310,0.91',
+        },
+      }),
+    });
+    expect([200, 502]).toContain(chatRes.status);
+
     const pdfBytes = buildPdfReportBytes(
       {
         provenanceId: orchData.auditUuid,

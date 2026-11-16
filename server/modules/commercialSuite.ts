@@ -1,4 +1,6 @@
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import { listCorpusChunks } from '../corpusIndex.ts';
 import { listFeedback } from '../feedbackStore.ts';
 import { logger } from '../logger.ts';
@@ -10,6 +12,7 @@ import type {
   AuthSession,
   EnterpriseCheckoutOrder,
   EnterpriseOverviewResponse,
+  EnterpriseQuotaStatus,
   EnterpriseQuoteResult,
   EnterpriseTierId,
   LaunchChecklistItem,
@@ -22,6 +25,25 @@ import type {
   UsageAnalyticsSummary,
   WhiteLabelConfig,
 } from '../types.ts';
+
+const COMMERCIAL_LEDGER_FILENAME = process.env.VITEST
+  ? 'commercial_ledger.vitest.json'
+  : 'commercial_ledger.json';
+const COMMERCIAL_LEDGER_PATH = path.resolve(
+  process.cwd(),
+  'data',
+  COMMERCIAL_LEDGER_FILENAME
+);
+const COMMERCIAL_LEDGER_REL = `data/${COMMERCIAL_LEDGER_FILENAME}`;
+
+const TIER_QUOTAS: Record<
+  EnterpriseTierId,
+  { name: string; simulationsMax: number | null; vectorQuotaMb: number }
+> = {
+  starter: { name: 'Starter', simulationsMax: 10, vectorQuotaMb: 1024 },
+  growth: { name: 'Growth', simulationsMax: 100, vectorQuotaMb: 102400 },
+  enterprise: { name: 'Enterprise', simulationsMax: null, vectorQuotaMb: 1048576 },
+};
 
 export const PRICING_TIERS: PricingTierSpec[] = [
   {
@@ -307,6 +329,7 @@ export function updateBrandConfig(
     domain: brandConfig.customDomain,
   });
 
+  persistCommercialLedger();
   return getBrandConfig();
 }
 
@@ -329,6 +352,7 @@ export function toggleLaunchChecklistItem(
     sourceUrls: [],
   });
 
+  persistCommercialLedger();
   return launchChecklist.map((entry) => ({ ...entry }));
 }
 
@@ -500,8 +524,83 @@ export function gradeSubmissionWithRubric(params: {
   };
 }
 
+let activeTier: EnterpriseTierId = 'growth';
+let simulationsConsumed = 0;
+let ledgerPersistedAt = new Date().toISOString();
 const checkoutOrders: EnterpriseCheckoutOrder[] = [];
 const partnerPayouts: PartnerPayoutRecord[] = [];
+
+function persistCommercialLedger(): void {
+  try {
+    fs.mkdirSync(path.dirname(COMMERCIAL_LEDGER_PATH), { recursive: true });
+    ledgerPersistedAt = new Date().toISOString();
+    fs.writeFileSync(
+      COMMERCIAL_LEDGER_PATH,
+      JSON.stringify(
+        {
+          activeTier,
+          simulationsConsumed,
+          brandConfig,
+          launchChecklist,
+          checkoutOrders,
+          partnerPayouts,
+          persistedAt: ledgerPersistedAt,
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+  } catch (err) {
+    logger.warn('enterprise', 'Failed writing commercial ledger snapshot', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+function loadCommercialLedger(): void {
+  if (process.env.VITEST) return;
+  try {
+    if (!fs.existsSync(COMMERCIAL_LEDGER_PATH)) return;
+    const raw = fs.readFileSync(COMMERCIAL_LEDGER_PATH, 'utf8');
+    const parsed = JSON.parse(raw) as {
+      activeTier?: EnterpriseTierId;
+      simulationsConsumed?: number;
+      brandConfig?: WhiteLabelConfig;
+      launchChecklist?: LaunchChecklistItem[];
+      checkoutOrders?: EnterpriseCheckoutOrder[];
+      partnerPayouts?: PartnerPayoutRecord[];
+      persistedAt?: string;
+    };
+    if (parsed.activeTier && TIER_QUOTAS[parsed.activeTier]) {
+      activeTier = parsed.activeTier;
+    }
+    if (typeof parsed.simulationsConsumed === 'number' && parsed.simulationsConsumed >= 0) {
+      simulationsConsumed = parsed.simulationsConsumed;
+    }
+    if (parsed.brandConfig) {
+      brandConfig = parsed.brandConfig;
+    }
+    if (Array.isArray(parsed.launchChecklist) && parsed.launchChecklist.length > 0) {
+      launchChecklist.splice(0, launchChecklist.length, ...parsed.launchChecklist);
+    }
+    if (Array.isArray(parsed.checkoutOrders)) {
+      checkoutOrders.splice(0, checkoutOrders.length, ...parsed.checkoutOrders);
+    }
+    if (Array.isArray(parsed.partnerPayouts)) {
+      partnerPayouts.splice(0, partnerPayouts.length, ...parsed.partnerPayouts);
+    }
+    if (parsed.persistedAt) {
+      ledgerPersistedAt = parsed.persistedAt;
+    }
+  } catch (err) {
+    logger.warn('enterprise', 'Could not reload commercial ledger snapshot', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+loadCommercialLedger();
 
 export class CommercialSuiteError extends Error {
   statusCode: number;
@@ -509,6 +608,75 @@ export class CommercialSuiteError extends Error {
     super(message);
     this.statusCode = statusCode;
   }
+}
+
+export function getQuotaStatus(): EnterpriseQuotaStatus {
+  const tierSpec = TIER_QUOTAS[activeTier];
+  const uploads = listAllUploads(500);
+  const uploadMb = uploads.reduce((sum, u) => sum + u.sizeBytes / (1024 * 1024), 0);
+  const corpusMb = listCorpusChunks().length * 0.05;
+  const storageUsedMb = Number((uploadMb + corpusMb).toFixed(2));
+  const simulationsRemaining =
+    tierSpec.simulationsMax === null
+      ? null
+      : Math.max(0, tierSpec.simulationsMax - simulationsConsumed);
+  const utilizationPct =
+    tierSpec.simulationsMax === null
+      ? 0
+      : Math.min(100, Math.round((simulationsConsumed / tierSpec.simulationsMax) * 100));
+
+  return {
+    activeTier,
+    activeTierName: tierSpec.name,
+    simulationsUsed: simulationsConsumed,
+    simulationsMax: tierSpec.simulationsMax,
+    simulationsRemaining,
+    vectorQuotaMb: tierSpec.vectorQuotaMb,
+    storageUsedMb,
+    utilizationPct,
+    ledgerPath: COMMERCIAL_LEDGER_REL,
+    persistedAt: ledgerPersistedAt,
+  };
+}
+
+export function assertQuotaAvailable(unitsRequested = 1): EnterpriseQuotaStatus {
+  const status = getQuotaStatus();
+  if (
+    status.simulationsMax !== null &&
+    status.simulationsUsed + unitsRequested > status.simulationsMax
+  ) {
+    throw new CommercialSuiteError(
+      429,
+      `Active ${status.activeTierName} simulation quota reached (${status.simulationsUsed}/${status.simulationsMax}). Stopping before exceeding limit so existing work is preserved.`
+    );
+  }
+  return status;
+}
+
+export function consumeSimulationQuota(units = 1): EnterpriseQuotaStatus {
+  assertQuotaAvailable(units);
+  simulationsConsumed += units;
+  persistCommercialLedger();
+  return getQuotaStatus();
+}
+
+export function updateActiveQuotaTier(
+  tier: EnterpriseTierId,
+  session: AuthSession
+): EnterpriseQuotaStatus {
+  activeTier = tier;
+  persistCommercialLedger();
+  recordProvenance({
+    kind: 'auth',
+    actorId: session.userId,
+    actorRole: session.role,
+    action: 'enterprise:quota-tier-updated',
+    rawInput: JSON.stringify({ tier, simulationsUsed: simulationsConsumed }),
+    modelOrEngine: 'quota-guardrail',
+    licenses: ['Enterprise Commercial Terms'],
+    sourceUrls: [],
+  });
+  return getQuotaStatus();
 }
 
 export function createCheckoutOrder(
@@ -644,6 +812,9 @@ export function createCheckoutOrder(
     },
   });
 
+  activeTier = quote.tier;
+  persistCommercialLedger();
+
   logger.info('enterprise', 'Enterprise checkout order & 55/45 payout recorded', {
     orderId,
     invoiceNumber,
@@ -708,6 +879,8 @@ export function settlePartnerPayout(
     },
   });
 
+  persistCommercialLedger();
+
   logger.info('enterprise', 'Partner payout marked settled in sandbox ledger', {
     payoutId: payout.payoutId,
     settlementReference: payout.settlementReference,
@@ -759,5 +932,6 @@ export function getEnterpriseOverview(): EnterpriseOverviewResponse {
     orders: checkoutOrders.map((o) => ({ ...o })),
     payouts: partnerPayouts.map((p) => ({ ...p })),
     payoutTotals: computePayoutTotals(),
+    quota: getQuotaStatus(),
   };
 }

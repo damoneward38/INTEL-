@@ -1,0 +1,207 @@
+{
+  "runId": "auto-055e3bc7",
+  "generatedAt": "2026-11-16T13:03:38.910Z",
+  "status": "converged",
+  "iterations": 1,
+  "totalSimulations": 18,
+  "successfulSimulations": 18,
+  "failedSimulations": 0,
+  "bestCandidate": {
+    "candidateId": "b0c2fc60-5b3d-4b59-9429-9516a0406a85",
+    "iteration": 1,
+    "parameters": {
+      "parameter_a": 0.908,
+      "parameter_b": 0.4719,
+      "parameter_c": 0.6692
+    },
+    "replicateCount": 3,
+    "meanReward": 0.80749,
+    "standardDeviation": 0.00333,
+    "confidenceLower": 0.804,
+    "confidenceUpper": 0.81064,
+    "confidenceWidth": 0.00664,
+    "metricsMean": {
+      "yield": 0.8651,
+      "toxicity": 0.1925,
+      "cost": 0.3821
+    },
+    "lockCriteriaMet": true
+  },
+  "bestReward": 0.80749,
+  "auditChainValid": true,
+  "headRecordHash": "8508fda21fbe96908f0c04f90065bcd298fc4865fe29245b7f930d3ed6b2ae47",
+  "reportPath": "autonomous_data/reports/auto-055e3bc7.json",
+  "physicalExecution": false,
+  "config": {
+    "batchSize": 6,
+    "replicates": 3,
+    "maxIterations": 8,
+    "maxParallelSimulations": 4,
+    "targetReward": 0.74,
+    "confidenceLevel": 0.95,
+    "minSuccessfulReplicates": 3,
+    "maxConfidenceIntervalWidth": 0.25,
+    "convergencePatience": 4,
+    "randomSeed": 42,
+    "bootstrapSamples": 600,
+    "parameterBounds": {
+      "parameter_a": [
+        0,
+        1
+      ],
+      "parameter_b": [
+        0,
+        1
+      ],
+      "parameter_c": [
+        0,
+        1
+      ]
+    },
+    "rewardWeights": {
+      "yield": 1,
+      "toxicity": 0.2,
+      "cost": 0.05
+    },
+    "virtualModeConfirmed": true
+  },
+  "iterationHistory": [
+    {
+      "iteration": 1,
+      "candidatesEvaluated": 6,
+      "iterationBestReward": 0.80749,
+      "globalBestReward": 0.80749,
+      "bestConfidenceLower": 0.804,
+      "bestConfidenceUpper": 0.81064,
+      "iterationsWithoutImprovement": 0
+    }
+  ],
+  "evaluations": [
+    {
+      "candidateId": "b91dddf1-c0d9-46e7-bbc7-0951f975347f",
+      "iteration": 1,
+      "parameters": {
+        "parameter_a": 0.8037,
+        "parameter_b": 0.0411,
+        "parameter_c": 0.63
+      },
+      "replicateCount": 3,
+      "meanReward": 0.72425,
+      "standardDeviation": 0.00406,
+      "confidenceLower": 0.72005,
+      "confidenceUpper": 0.72816,
+      "confidenceWidth": 0.00811,
+      "metricsMean": {
+        "yield": 0.7708,
+        "toxicity": 0.1436,
+        "cost": 0.3565
+      },
+      "lockCriteriaMet": false
+    },
+    {
+      "candidateId": "c9fca2e4-f1d0-4aae-81dd-d12f3fcfd5dd",
+      "iteration": 1,
+      "parameters": {
+        "parameter_a": 0.5237,
+        "parameter_b": 0.2925,
+        "parameter_c": 0.1857
+      },
+      "replicateCount": 3,
+      "meanReward": 0.50839,
+      "standardDeviation": 0.00316,
+      "confidenceLower": 0.50552,
+      "confidenceUpper": 0.51178,
+      "confidenceWidth": 0.00626,
+      "metricsMean": {
+        "yield": 0.543,
+        "toxicity": 0.112,
+        "cost": 0.2452
+      },
+      "lockCriteriaMet": false
+    },
+    {
+      "candidateId": "310f5e4f-501c-40c9-8246-d9026e9888e5",
+      "iteration": 1,
+      "parameters": {
+        "parameter_a": 0.6302,
+        "parameter_b": 0.9269,
+        "parameter_c": 0.8058
+      },
+      "replicateCount": 3,
+      "meanReward": 0.3065,
+      "standardDeviation": 0.00255,
+      "confidenceLower": 0.30429,
+      "confidenceUpper": 0.30929,
+      "confidenceWidth": 0.00499,
+      "metricsMean": {
+        "yield": 0.3883,
+        "toxicity": 0.3206,
+        "cost": 0.3529
+      },
+      "lockCriteriaMet": false
+    },
+    {
+      "candidateId": "e253c3b5-ab0f-4c55-a728-c27586774ee0",
+      "iteration": 1,
+      "parameters": {
+        "parameter_a": 0.5359,
+        "parameter_b": 0.9684,
+        "parameter_c": 0.8284
+      },
+      "replicateCount": 3,
+      "meanReward": 0.22765,
+      "standardDeviation": 0.00369,
+      "confidenceLower": 0.22373,
+      "confidenceUpper": 0.23105,
+      "confidenceWidth": 0.00732,
+      "metricsMean": {
+        "yield": 0.3095,
+        "toxicity": 0.3255,
+        "cost": 0.3354
+      },
+      "lockCriteriaMet": false
+    },
+    {
+      "candidateId": "49e09838-38ae-4bb7-ac3f-acd381d7a5e7",
+      "iteration": 1,
+      "parameters": {
+        "parameter_a": 0.0957,
+        "parameter_b": 0.0339,
+        "parameter_c": 0.6768
+      },
+      "replicateCount": 3,
+      "meanReward": 0.21865,
+      "standardDeviation": 0.0004,
+      "confidenceLower": 0.21826,
+      "confidenceUpper": 0.21907,
+      "confidenceWidth": 0.00081,
+      "metricsMean": {
+        "yield": 0.2478,
+        "toxicity": 0.0866,
+        "cost": 0.2359
+      },
+      "lockCriteriaMet": false
+    },
+    {
+      "candidateId": "b0c2fc60-5b3d-4b59-9429-9516a0406a85",
+      "iteration": 1,
+      "parameters": {
+        "parameter_a": 0.908,
+        "parameter_b": 0.4719,
+        "parameter_c": 0.6692
+      },
+      "replicateCount": 3,
+      "meanReward": 0.80749,
+      "standardDeviation": 0.00333,
+      "confidenceLower": 0.804,
+      "confidenceUpper": 0.81064,
+      "confidenceWidth": 0.00664,
+      "metricsMean": {
+        "yield": 0.8651,
+        "toxicity": 0.1925,
+        "cost": 0.3821
+      },
+      "lockCriteriaMet": true
+    }
+  ]
+}

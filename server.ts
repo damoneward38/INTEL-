@@ -26,7 +26,7 @@ import { listLicenseRecords, verifyLicenseRecord } from './server/governance.ts'
 import { runExternalIngestion } from './server/ingestionService.ts';
 import { logger } from './server/logger.ts';
 import { listProvenance, recordProvenance } from './server/provenance.ts';
-import { runResearchQuery } from './server/researchService.ts';
+import { runResearchChat, runResearchQuery } from './server/researchService.ts';
 import {
   cancelSimulationJob,
   getSimulationJob,
@@ -87,12 +87,16 @@ import {
 } from './server/modules/allUploadService.ts';
 import {
   CommercialSuiteError,
+  assertQuotaAvailable,
   calculateEnterpriseQuote,
+  consumeSimulationQuota,
   createCheckoutOrder,
   getEnterpriseOverview,
+  getQuotaStatus,
   gradeSubmissionWithRubric,
   settlePartnerPayout,
   toggleLaunchChecklistItem,
+  updateActiveQuotaTier,
   updateBrandConfig,
 } from './server/modules/commercialSuite.ts';
 import {
@@ -113,6 +117,39 @@ import {
   recordUiButtonAudit,
   runMasterPipeline,
 } from './server/modules/orchestratorService.ts';
+import {
+  AutonomousControllerError,
+  getAutonomousOverview,
+  getAutonomousRunReport,
+  planPolicyBatch,
+  recordPolicyFeedback,
+  runClosedLoopAutonomousSimulation,
+  runVirtualSimulationReplicate,
+  validateParameters,
+  verifyAutonomousAuditChain,
+} from './server/modules/autonomousController.ts';
+import { buildUploadedArtifact } from './server/commandPipeline/interpreter.ts';
+import {
+  approvePipelineJob,
+  cancelPipelineJob,
+  submitCommandJob,
+  subscribeToPipelineJob,
+} from './server/commandPipeline/orchestrator.ts';
+import { SIMULATOR_ADAPTERS } from './server/commandPipeline/simulators.ts';
+import {
+  getJobRecord,
+  getPipelineDb,
+  getPipelineSettings,
+  listAuditChainEntries,
+  listJobEvents,
+  listJobRecords,
+  listUploadedArtifacts,
+  recoverInterruptedJobs,
+  savePipelineSettings,
+  saveUploadedArtifact,
+  verifyAuditChainIntegrity,
+} from './server/commandPipeline/sqliteStore.ts';
+import { PIPELINE_STAGE_DEFINITIONS } from './server/commandPipeline/stages.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -172,16 +209,26 @@ const loginSchema = z.object({
 
 export function createApp() {
   initializeCorpus();
+  getPipelineDb();
+  recoverInterruptedJobs();
   const app = express();
   app.use(express.json({ limit: '1mb' }));
   app.use(attachSession);
 
   app.get('/api/health', (_req, res) => {
+    const jobs = listJobRecords(100);
     res.json({
       status: 'ok',
       geminiConfigured: Boolean(process.env.GEMINI_API_KEY),
       corpusChunks: listCorpusChunks().length,
       activeSimulations: listSimulationJobs().filter((j) => j.state === 'running').length,
+      commandPipeline: {
+        sqliteReady: true,
+        totalJobs: jobs.length,
+        activeJobs: jobs.filter((j) => j.status === 'running' || j.status === 'queued').length,
+        simulatorCount: SIMULATOR_ADAPTERS.length,
+        stageCount: PIPELINE_STAGE_DEFINITIONS.length,
+      },
       timestamp: new Date().toISOString(),
     });
   });
@@ -364,6 +411,53 @@ export function createApp() {
     }
   });
 
+  app.post('/api/research/chat', async (req, res) => {
+    const schema = z.object({
+      message: z.string().trim().min(2).max(4000),
+      persona: z.enum(['synthesizer', 'protocol', 'simulation']).default('synthesizer'),
+      language: z.enum(['en', 'he']).default('en'),
+      history: z
+        .array(
+          z.object({
+            role: z.enum(['user', 'assistant']),
+            text: z.string().max(4000),
+          })
+        )
+        .max(20)
+        .default([]),
+      artifactContext: z
+        .object({
+          filename: z.string().trim().min(1).max(200),
+          excerpt: z.string().max(8000).optional(),
+          summary: z.string().max(2000).optional(),
+        })
+        .optional(),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Invalid research chat payload.', issues: parsed.error.issues });
+      return;
+    }
+    const authReq = req as AuthenticatedRequest;
+    try {
+      const chatResult = await runResearchChat(
+        {
+          message: parsed.data.message,
+          persona: parsed.data.persona,
+          language: parsed.data.language,
+          history: parsed.data.history.map((h) => ({ role: h.role, text: h.text })),
+          artifactContext: parsed.data.artifactContext,
+        },
+        authReq.sessionUser
+      );
+      res.json(chatResult);
+    } catch (err) {
+      res.status(502).json({
+        error: err instanceof Error ? err.message : 'Research chatbot error.',
+      });
+    }
+  });
+
   app.post('/api/simulation/run', (req, res) => {
     const parsed = simulationSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -381,6 +475,16 @@ export function createApp() {
         requiredRoles: ['researcher', 'principal_investigator'],
       });
       return;
+    }
+
+    try {
+      consumeSimulationQuota(1);
+    } catch (err) {
+      if (err instanceof CommercialSuiteError) {
+        res.status(err.statusCode).json({ error: err.message });
+        return;
+      }
+      throw err;
     }
 
     const job = submitSimulationJob(parsed.data, authReq.sessionUser);
@@ -1006,6 +1110,28 @@ export function createApp() {
     res.json(getEnterpriseOverview());
   });
 
+  app.get('/api/enterprise/quota', (_req, res) => {
+    res.json({ quota: getQuotaStatus() });
+  });
+
+  app.post(
+    '/api/enterprise/quota',
+    requireRole(['researcher', 'principal_investigator', 'auditor']),
+    (req, res) => {
+      const schema = z.object({
+        tier: z.enum(['starter', 'growth', 'enterprise']),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: 'Invalid quota tier selection.' });
+        return;
+      }
+      const authReq = req as AuthenticatedRequest;
+      const quota = updateActiveQuotaTier(parsed.data.tier, authReq.sessionUser);
+      res.json({ quota });
+    }
+  );
+
   app.post('/api/enterprise/quote', (req, res) => {
     const schema = z.object({
       tier: z.enum(['starter', 'growth', 'enterprise']),
@@ -1456,6 +1582,408 @@ export function createApp() {
     res.status(201).json({ summary });
   });
 
+  // -------------------------------------------------------------------------
+  // 15. Closed-Loop Autonomous Virtual Simulation Controller + Python Adapters
+  // -------------------------------------------------------------------------
+  app.get('/api/autonomous/overview', (_req, res) => {
+    res.json(getAutonomousOverview());
+  });
+
+  app.get('/api/autonomous/verify', (req, res) => {
+    const runId = typeof req.query.runId === 'string' ? req.query.runId : undefined;
+    res.json(verifyAutonomousAuditChain(runId));
+  });
+
+  app.get('/api/autonomous/runs/:runId', (req, res) => {
+    const run = getAutonomousRunReport(req.params.runId);
+    if (!run) {
+      res.status(404).json({ error: 'Autonomous run report not found.' });
+      return;
+    }
+    const chain = verifyAutonomousAuditChain(run.runId);
+    res.json({ run, chain });
+  });
+
+  app.post(
+    '/api/autonomous/run',
+    requireRole(['researcher', 'principal_investigator']),
+    async (req, res) => {
+      const schema = z.object({
+        batchSize: z.number().int().min(1).max(32).default(8),
+        replicates: z.number().int().min(3).max(10).default(3),
+        maxIterations: z.number().int().min(1).max(40).default(12),
+        maxParallelSimulations: z.number().int().min(1).max(16).default(4),
+        targetReward: z.number().min(-1).max(2).default(0.75),
+        confidenceLevel: z.number().min(0.5).max(0.999).default(0.95),
+        minSuccessfulReplicates: z.number().int().min(1).max(10).default(3),
+        maxConfidenceIntervalWidth: z.number().positive().max(2).default(0.2),
+        convergencePatience: z.number().int().min(1).max(30).default(5),
+        randomSeed: z.number().int().min(0).max(1_000_000).default(42),
+        bootstrapSamples: z.number().int().min(200).max(5000).default(3000),
+        virtualModeConfirmed: z.boolean(),
+      });
+
+      const parsed = schema.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        res.status(400).json({
+          error: 'Invalid autonomous controller configuration.',
+          issues: parsed.error.issues,
+        });
+        return;
+      }
+
+      const authReq = req as AuthenticatedRequest;
+      try {
+        assertQuotaAvailable(1);
+        const run = await runClosedLoopAutonomousSimulation(
+          parsed.data,
+          authReq.sessionUser
+        );
+        consumeSimulationQuota(1);
+        res.status(201).json({ run });
+      } catch (err) {
+        if (err instanceof CommercialSuiteError) {
+          res.status(err.statusCode).json({ error: err.message });
+          return;
+        }
+        if (err instanceof AutonomousControllerError) {
+          res.status(err.statusCode).json({ error: err.message });
+          return;
+        }
+        res.status(400).json({
+          error:
+            err instanceof Error ? err.message : 'Autonomous controller failed.',
+        });
+      }
+    }
+  );
+
+  // HTTP adapters matching autonomous_controller.py (POLICY_URL / SIMULATOR_URL)
+  app.post('/plan', (req, res) => {
+    const schema = z.object({
+      run_id: z.string().trim().min(1),
+      iteration: z.number().int().min(0),
+      batch_size: z.number().int().min(1).max(64),
+      best_reward: z.number().nullable().optional(),
+      best_candidate: z
+        .object({ parameters: z.record(z.string(), z.number()).optional() })
+        .nullable()
+        .optional(),
+      parameter_bounds: z
+        .record(z.string(), z.tuple([z.number(), z.number()]))
+        .optional(),
+      mode: z.string().optional(),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Invalid /plan request.', issues: parsed.error.issues });
+      return;
+    }
+    try {
+      const batch = planPolicyBatch({
+        runId: parsed.data.run_id,
+        iteration: parsed.data.iteration,
+        batchSize: parsed.data.batch_size,
+        bestReward: parsed.data.best_reward,
+        bestCandidate: parsed.data.best_candidate,
+        parameterBounds: parsed.data.parameter_bounds,
+      });
+      res.json({ batch, mode: 'virtual_simulation' });
+    } catch (err) {
+      res.status(400).json({ error: err instanceof Error ? err.message : 'Planning error.' });
+    }
+  });
+
+  app.post('/simulate', (req, res) => {
+    const schema = z.object({
+      candidate_id: z.string().trim().min(1),
+      iteration: z.number().int().min(0),
+      replicate: z.number().int().min(1),
+      parameters: z.record(z.string(), z.number()),
+      mode: z.string().default('virtual'),
+      physical_execution: z.literal(false),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({
+        error: 'Invalid /simulate request (physical_execution must be false).',
+        issues: parsed.error.issues,
+      });
+      return;
+    }
+    try {
+      validateParameters(parsed.data.parameters);
+      const output = runVirtualSimulationReplicate(
+        parsed.data.parameters,
+        parsed.data.iteration,
+        parsed.data.replicate
+      );
+      res.json(output);
+    } catch (err) {
+      if (err instanceof AutonomousControllerError) {
+        res.status(err.statusCode).json({ error: err.message });
+        return;
+      }
+      res.status(400).json({ error: err instanceof Error ? err.message : 'Simulation error.' });
+    }
+  });
+
+  app.post('/update', (req, res) => {
+    const schema = z.object({
+      run_id: z.string().trim().min(1),
+      candidate_id: z.string().trim().min(1),
+      parameters: z.record(z.string(), z.number()),
+      reward: z.number(),
+      confidence_interval: z.tuple([z.number(), z.number()]).optional(),
+      metrics_mean: z.record(z.string(), z.number()).optional(),
+      replicates: z.number().int().optional(),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Invalid /update request.', issues: parsed.error.issues });
+      return;
+    }
+    const feedback = recordPolicyFeedback({
+      runId: parsed.data.run_id,
+      candidateId: parsed.data.candidate_id,
+      parameters: parsed.data.parameters,
+      reward: parsed.data.reward,
+    });
+    res.json(feedback);
+  });
+
+  // -------------------------------------------------------------------------
+  // 14. Command Center — 30-Stage Autonomous Formulation, Pipeline & 3D Demo
+  // -------------------------------------------------------------------------
+  const commandUploadMiddleware = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 25 * 1024 * 1024 },
+  });
+
+  app.post('/api/upload', (req, res) => {
+    commandUploadMiddleware.single('file')(req, res, (multerErr) => {
+      if (multerErr) {
+        res.status(400).json({ error: multerErr instanceof Error ? multerErr.message : 'Upload failed.' });
+        return;
+      }
+      if (req.file) {
+        const artifact = buildUploadedArtifact({
+          filename: req.file.originalname,
+          mimeType: req.file.mimetype,
+          buffer: req.file.buffer,
+        });
+        saveUploadedArtifact(artifact);
+        res.status(201).json({ artifact });
+        return;
+      }
+      const schema = z.object({
+        filename: z.string().trim().min(1).max(200).default('matrix_input.json'),
+        content: z.string().min(1),
+        mimeType: z.string().optional(),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: 'Provide multipart "file" or JSON { filename, content }.' });
+        return;
+      }
+      const artifact = buildUploadedArtifact({
+        filename: parsed.data.filename,
+        mimeType: parsed.data.mimeType || 'text/plain',
+        buffer: Buffer.from(parsed.data.content, 'utf8'),
+      });
+      saveUploadedArtifact(artifact);
+      res.status(201).json({ artifact });
+    });
+  });
+
+  const commandSchema = z.object({
+    commandText: z.string().trim().min(2).max(4000),
+    inputMode: z.enum(['voice', 'text', 'file', 'matrix', 'dataset', 'api']).optional(),
+    uploadId: z.string().trim().optional(),
+    inlineDataText: z.string().max(40000).optional(),
+    matrix: z.array(z.record(z.string(), z.union([z.number(), z.string()]))).max(100).optional(),
+    idempotencyKey: z.string().trim().max(120).optional(),
+  });
+
+  app.post('/api/command', (req, res) => {
+    const parsed = commandSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Invalid command request.', issues: parsed.error.issues });
+      return;
+    }
+    const authReq = req as AuthenticatedRequest;
+    const { job, deduplicated } = submitCommandJob({
+      ...parsed.data,
+      actor: {
+        userId: authReq.sessionUser.userId,
+        role: authReq.sessionUser.role,
+        name: authReq.sessionUser.name,
+      },
+    });
+    res.status(deduplicated ? 200 : 202).json({ job, deduplicated });
+  });
+
+  app.post('/api/jobs', (req, res) => {
+    const parsed = commandSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Invalid job payload.', issues: parsed.error.issues });
+      return;
+    }
+    const authReq = req as AuthenticatedRequest;
+    const { job, deduplicated } = submitCommandJob({
+      ...parsed.data,
+      actor: {
+        userId: authReq.sessionUser.userId,
+        role: authReq.sessionUser.role,
+        name: authReq.sessionUser.name,
+      },
+    });
+    res.status(deduplicated ? 200 : 201).json({ job, deduplicated });
+  });
+
+  app.get('/api/jobs', (req, res) => {
+    const limit = typeof req.query.limit === 'string' ? Number(req.query.limit) : 40;
+    res.json({
+      jobs: listJobRecords(Number.isFinite(limit) ? Math.min(100, limit) : 40),
+      uploads: listUploadedArtifacts(20),
+    });
+  });
+
+  app.get('/api/jobs/:jobId', (req, res) => {
+    const job = getJobRecord(req.params.jobId);
+    if (!job) {
+      res.status(404).json({ error: 'Pipeline job not found.' });
+      return;
+    }
+    res.json({ job });
+  });
+
+  app.get('/api/jobs/:jobId/events', (req, res) => {
+    const job = getJobRecord(req.params.jobId);
+    if (!job) {
+      res.status(404).json({ error: 'Pipeline job not found.' });
+      return;
+    }
+    const afterSeq = typeof req.query.afterSequence === 'string' ? Number(req.query.afterSequence) : 0;
+    const events = listJobEvents(job.jobId, Number.isFinite(afterSeq) ? afterSeq : 0);
+    res.json({ jobId: job.jobId, events });
+  });
+
+  app.get('/api/jobs/:jobId/results', (req, res) => {
+    const job = getJobRecord(req.params.jobId);
+    if (!job) {
+      res.status(404).json({ error: 'Pipeline job not found.' });
+      return;
+    }
+    const winner = job.candidates.find((c) => c.candidateId === job.selectedCandidateId) ?? null;
+    res.json({
+      jobId: job.jobId,
+      status: job.status,
+      intent: job.intent,
+      domain: job.domain,
+      simulatorId: job.simulatorId,
+      selectedCandidate: winner,
+      candidates: job.candidates,
+      optimizationHistory: job.optimizationHistory,
+      entities: job.entities,
+      knowledgeEdges: job.knowledgeEdges,
+      limitations: job.limitations,
+    });
+  });
+
+  app.get('/api/jobs/:jobId/report', (req, res) => {
+    const job = getJobRecord(req.params.jobId);
+    if (!job) {
+      res.status(404).json({ error: 'Pipeline job not found.' });
+      return;
+    }
+    res.json({
+      jobId: job.jobId,
+      status: job.status,
+      reportMarkdown: job.reportMarkdown ?? 'Report not yet finalized.',
+      selectedCandidate:
+        job.candidates.find((c) => c.candidateId === job.selectedCandidateId) ?? null,
+      candidates: job.candidates,
+      auditEntries: listAuditChainEntries(job.jobId),
+      auditVerification: verifyAuditChainIntegrity(),
+    });
+  });
+
+  app.post('/api/jobs/:jobId/cancel', (req, res) => {
+    const updated = cancelPipelineJob(req.params.jobId);
+    if (!updated) {
+      res.status(404).json({ error: 'Pipeline job not found.' });
+      return;
+    }
+    res.json({ job: updated });
+  });
+
+  app.post(
+    '/api/jobs/:jobId/approve',
+    requireRole(['researcher', 'principal_investigator', 'auditor']),
+    (req, res) => {
+      const authReq = req as AuthenticatedRequest;
+      const updated = approvePipelineJob(req.params.jobId, {
+        userId: authReq.sessionUser.userId,
+        name: authReq.sessionUser.name,
+        role: authReq.sessionUser.role,
+      });
+      if (!updated) {
+        res.status(404).json({ error: 'Pipeline job not found.' });
+        return;
+      }
+      res.json({ job: updated });
+    }
+  );
+
+  app.get('/api/pipeline/stages', (_req, res) => {
+    res.json({ stages: PIPELINE_STAGE_DEFINITIONS });
+  });
+
+  app.get('/api/simulators', (_req, res) => {
+    res.json({ simulators: SIMULATOR_ADAPTERS });
+  });
+
+  app.get('/api/pipeline/audit', (req, res) => {
+    const jobId = typeof req.query.jobId === 'string' ? req.query.jobId : undefined;
+    res.json({
+      entries: listAuditChainEntries(jobId, 200),
+      verification: verifyAuditChainIntegrity(),
+    });
+  });
+
+  app.get('/api/pipeline/settings', (_req, res) => {
+    res.json({ settings: getPipelineSettings() });
+  });
+
+  app.post(
+    '/api/pipeline/settings',
+    requireRole(['principal_investigator', 'auditor']),
+    (req, res) => {
+      const schema = z.object({
+        maxConcurrentJobs: z.number().int().min(1).max(8).optional(),
+        defaultReplicates: z.number().int().min(2).max(12).optional(),
+        defaultRetryLimit: z.number().int().min(0).max(5).optional(),
+        voiceAutoSpeak: z.boolean().optional(),
+        enforceMedicalSafetyGate: z.boolean().optional(),
+        preferredModel: z.string().trim().min(2).max(80).optional(),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: 'Invalid pipeline settings payload.' });
+        return;
+      }
+      const settings = savePipelineSettings(parsed.data);
+      res.json({ settings });
+    }
+  );
+
+  app.use('/api', (req, res) => {
+    res.status(404).json({
+      error: `API endpoint not found: ${req.method} ${req.originalUrl}`,
+    });
+  });
+
   return app;
 }
 
@@ -1630,6 +2158,51 @@ async function startServer() {
     }
   );
 
+  const jobsWss = new WebSocketServer({ noServer: true });
+  jobsWss.on(
+    'connection',
+    (
+      socket: WebSocket,
+      _req: http.IncomingMessage,
+      info: { jobId: string; afterSequence: number }
+    ) => {
+      const job = getJobRecord(info.jobId);
+      if (!job) {
+        socket.send(
+          JSON.stringify({
+            type: 'job.failed',
+            job_id: info.jobId,
+            sequence: 0,
+            message: 'Requested job ID does not exist.',
+          })
+        );
+        socket.close();
+        return;
+      }
+
+      let lastSentSeq = info.afterSequence;
+      const backlog = listJobEvents(info.jobId, info.afterSequence);
+      for (const evt of backlog) {
+        if (socket.readyState === socket.OPEN) {
+          socket.send(JSON.stringify(evt));
+          lastSentSeq = Math.max(lastSentSeq, evt.sequence);
+        }
+      }
+
+      const unsubscribe = subscribeToPipelineJob(info.jobId, (evt) => {
+        if (evt.sequence <= lastSentSeq) return;
+        lastSentSeq = evt.sequence;
+        if (socket.readyState === socket.OPEN) {
+          socket.send(JSON.stringify(evt));
+        }
+      });
+
+      socket.on('close', () => {
+        unsubscribe();
+      });
+    }
+  );
+
   server.on('upgrade', (request, socket, head) => {
     const reqUrl = request.url || '';
     const simMatch = reqUrl.match(/^\/ws\/simulations\/([^/?#]+)/);
@@ -1644,6 +2217,17 @@ async function startServer() {
     if (reqUrl.startsWith('/ws/flux')) {
       fluxWss.handleUpgrade(request, socket, head, (ws) => {
         fluxWss.emit('connection', ws, request);
+      });
+      return;
+    }
+
+    const jobsWsMatch = reqUrl.match(/^\/ws\/jobs\/([^/?#]+)(\?.*)?$/);
+    if (jobsWsMatch) {
+      const jobId = decodeURIComponent(jobsWsMatch[1]);
+      const params = new URLSearchParams(jobsWsMatch[2] || '');
+      const afterSequence = Number(params.get('afterSequence') || '0') || 0;
+      jobsWss.handleUpgrade(request, socket, head, (ws) => {
+        jobsWss.emit('connection', ws, request, { jobId, afterSequence });
       });
       return;
     }
@@ -1664,7 +2248,11 @@ async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        allowedHosts: true,
+        ws: { server },
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);

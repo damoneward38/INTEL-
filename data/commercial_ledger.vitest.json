@@ -1,0 +1,130 @@
+{
+  "activeTier": "enterprise",
+  "simulationsConsumed": 10,
+  "brandConfig": {
+    "enabled": true,
+    "brandName": "BioCorp",
+    "brandNameHe": "ביו-קורפ",
+    "tagline": "Genomics Cloud",
+    "taglineHe": "ענן גנומיקה",
+    "accentColor": "emerald",
+    "customDomain": "app.biocorp.io",
+    "complianceSuite": {
+      "hipaaReady": true,
+      "iso27001Controls": true,
+      "auditRetentionDays": 365
+    },
+    "updatedBy": "usr-pi-01",
+    "updatedAt": "2026-11-16T13:34:54.626Z"
+  },
+  "launchChecklist": [
+    {
+      "id": "chk-pricing",
+      "category": "Pricing & Contracts",
+      "task": "Finalize tier quotes, 90-day pilot terms, and 10% yearly billing schedule",
+      "done": true
+    },
+    {
+      "id": "chk-whitelabel",
+      "category": "White-Label Kit",
+      "task": "Verify brand override (logo text, accent color, tagline, custom domain)",
+      "done": true
+    },
+    {
+      "id": "chk-compliance",
+      "category": "Security & Compliance",
+      "task": "Validate SHA-256 provenance ledger, RBAC roles, and AES-256-GCM consent gates",
+      "done": true
+    },
+    {
+      "id": "chk-all-upload",
+      "category": "All-Upload Optimizer",
+      "task": "Stress-test PDF/DOCX/CSV/ZIP extraction limits and path-traversal guardrails",
+      "done": true
+    },
+    {
+      "id": "chk-partners",
+      "category": "Go-to-Market Pilot",
+      "task": "Publish 2-week PoC agreement for initial university or biotech design partner",
+      "done": false
+    }
+  ],
+  "checkoutOrders": [
+    {
+      "orderId": "ord-b495881b",
+      "invoiceNumber": "INV-2026-1002",
+      "buyerUserId": "usr-b9189912",
+      "buyerRole": "researcher",
+      "organization": "BioSystems Pilot Team",
+      "billingEmail": "researcher.1794836090465@biolab-e2e.org",
+      "partnerName": "BioSystems Pilot Team",
+      "tier": "starter",
+      "tierName": "Starter",
+      "numUsers": 5,
+      "customization": false,
+      "billingCycle": "yearly",
+      "trialStatus": "active_90d_trial",
+      "dueTodayUsd": 0,
+      "contractTotalUsd": 3229,
+      "paymentMode": "internal_sandbox_ledger",
+      "billingNotice": "Recorded in internal sandbox billing ledger (no external Stripe/bank card charge executed without STRIPE_SECRET_KEY).",
+      "receiptDigestSha256": "29752e4aa9f0ba977724535dfc6be3050b91c98f9bf570e0767437edc9aa1d53",
+      "createdAt": "2026-11-16T13:34:51.935Z"
+    },
+    {
+      "orderId": "ord-0665ef98",
+      "invoiceNumber": "INV-2026-1001",
+      "buyerUserId": "usr-b9189912",
+      "buyerRole": "researcher",
+      "organization": "BioSystems E2E Lab",
+      "billingEmail": "researcher.1794836090465@biolab-e2e.org",
+      "partnerName": "BioSystems Consortium Partner",
+      "tier": "growth",
+      "tierName": "Growth",
+      "numUsers": 20,
+      "customization": true,
+      "billingCycle": "monthly",
+      "trialStatus": "invoiced_immediate",
+      "dueTodayUsd": 2998,
+      "contractTotalUsd": 2998,
+      "paymentMode": "internal_sandbox_ledger",
+      "billingNotice": "Recorded in internal sandbox billing ledger (no external Stripe/bank card charge executed without STRIPE_SECRET_KEY).",
+      "receiptDigestSha256": "382e6ed0362d888f126f3b73a5777dd3cd991d3ce87f91374beed10f0cad025c",
+      "createdAt": "2026-11-16T13:34:51.928Z"
+    }
+  ],
+  "partnerPayouts": [
+    {
+      "payoutId": "pay-6794ee53",
+      "orderId": "ord-b495881b",
+      "invoiceNumber": "INV-2026-1002",
+      "partnerName": "BioSystems Pilot Team",
+      "partnerEmail": "researcher.1794836090465@biolab-e2e.org",
+      "grossUsd": 3229,
+      "platformShareUsd": 1775.95,
+      "partnerShareUsd": 1453.05,
+      "splitRatio": "55/45",
+      "status": "pending_payout",
+      "settlementMode": "internal_sandbox_ledger",
+      "createdAt": "2026-11-16T13:34:51.935Z"
+    },
+    {
+      "payoutId": "pay-16ad2d16",
+      "orderId": "ord-0665ef98",
+      "invoiceNumber": "INV-2026-1001",
+      "partnerName": "BioSystems Consortium Partner",
+      "partnerEmail": "researcher.1794836090465@biolab-e2e.org",
+      "grossUsd": 2998,
+      "platformShareUsd": 1648.9,
+      "partnerShareUsd": 1349.1,
+      "splitRatio": "55/45",
+      "status": "settled",
+      "settlementMode": "internal_sandbox_ledger",
+      "createdAt": "2026-11-16T13:34:51.928Z",
+      "settledBy": "usr-a219ccca",
+      "settledAt": "2026-11-16T13:34:51.943Z",
+      "settlementReference": "STL-6F3C47BC"
+    }
+  ],
+  "persistedAt": "2026-11-16T13:34:54.716Z"
+}

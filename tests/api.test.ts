@@ -439,5 +439,19 @@ describe('Full Express API Route Coverage & RBAC', () => {
       headers: { Authorization: `Bearer ${auditorToken}` },
     });
     expect(auditorLogsRes.status).toBe(200);
+
+    // Unmatched /api/* routes must return JSON 404 instead of falling through to Vite/SPA
+    const missingApiRes = await fetch(`${baseUrl}/api/nonexistent-endpoint-check`);
+    expect(missingApiRes.status).toBe(404);
+    const missingApiJson = (await missingApiRes.json()) as { error?: string };
+    expect(typeof missingApiJson.error).toBe('string');
+    expect(missingApiJson.error).toContain('API endpoint not found');
+  });
+
+  it('configures Vite allowedHosts: true so preview hosts do not receive 403 Blocked request', async () => {
+    const fs = await import('node:fs');
+    const viteCfg = fs.readFileSync('vite.config.ts', 'utf8');
+    expect(viteCfg).toContain('allowedHosts: true');
   });
 });
+

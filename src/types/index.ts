@@ -578,6 +578,19 @@ export interface PartnerPayoutTotals {
   settledCount: number;
 }
 
+export interface EnterpriseQuotaStatus {
+  activeTier: EnterpriseTierId;
+  activeTierName: string;
+  simulationsUsed: number;
+  simulationsMax: number | null;
+  simulationsRemaining: number | null;
+  vectorQuotaMb: number;
+  storageUsedMb: number;
+  utilizationPct: number;
+  ledgerPath: string;
+  persistedAt: string;
+}
+
 export interface EnterpriseOverviewResponse {
   tiers: PricingTierSpec[];
   whiteLabel: WhiteLabelConfig;
@@ -588,6 +601,7 @@ export interface EnterpriseOverviewResponse {
   orders: EnterpriseCheckoutOrder[];
   payouts: PartnerPayoutRecord[];
   payoutTotals: PartnerPayoutTotals;
+  quota: EnterpriseQuotaStatus;
 }
 
 export interface AutoOptimizeParameterSpec {
@@ -773,6 +787,122 @@ export interface OrchestratorAuditEntry {
   details: Record<string, unknown>;
   timestamp: string;
 }
+
+export interface AutonomousRewardWeights {
+  yield: number;
+  toxicity: number;
+  cost: number;
+}
+
+export interface AutonomousControllerConfig {
+  batchSize: number;
+  replicates: number;
+  maxIterations: number;
+  maxParallelSimulations: number;
+  targetReward: number;
+  confidenceLevel: number;
+  minSuccessfulReplicates: number;
+  maxConfidenceIntervalWidth: number;
+  convergencePatience: number;
+  randomSeed: number;
+  bootstrapSamples: number;
+  parameterBounds: Record<string, [number, number]>;
+  rewardWeights: AutonomousRewardWeights;
+  virtualModeConfirmed: boolean;
+}
+
+export interface AutonomousEvaluation {
+  candidateId: string;
+  iteration: number;
+  parameters: Record<string, number>;
+  replicateCount: number;
+  meanReward: number;
+  standardDeviation: number;
+  confidenceLower: number;
+  confidenceUpper: number;
+  confidenceWidth: number;
+  metricsMean: {
+    yield: number;
+    toxicity: number;
+    cost: number;
+  };
+  lockCriteriaMet: boolean;
+}
+
+export interface AutonomousIterationPoint {
+  iteration: number;
+  candidatesEvaluated: number;
+  iterationBestReward: number | null;
+  globalBestReward: number | null;
+  bestConfidenceLower: number | null;
+  bestConfidenceUpper: number | null;
+  iterationsWithoutImprovement: number;
+}
+
+export interface AutonomousAuditEventRecord {
+  id: number;
+  eventId: string;
+  runId: string;
+  timestamp: string;
+  event: string;
+  payload: Record<string, unknown>;
+  previousHash: string;
+  recordHash: string;
+}
+
+export interface AutonomousRunReport {
+  runId: string;
+  generatedAt: string;
+  status:
+    | 'converged'
+    | 'stopped_no_improvement'
+    | 'max_iterations_reached'
+    | 'failed'
+    | 'audit_integrity_failure';
+  iterations: number;
+  totalSimulations: number;
+  successfulSimulations: number;
+  failedSimulations: number;
+  bestCandidate: AutonomousEvaluation | null;
+  bestReward: number | null;
+  auditChainValid: boolean;
+  headRecordHash: string;
+  reportPath: string;
+  physicalExecution: false;
+  config: AutonomousControllerConfig;
+  iterationHistory: AutonomousIterationPoint[];
+  evaluations: AutonomousEvaluation[];
+}
+
+export interface AutonomousOverviewResponse {
+  defaultConfig: AutonomousControllerConfig;
+  auditChainValid: boolean;
+  totalAuditEvents: number;
+  headRecordHash: string;
+  auditFilePath: string;
+  runs: AutonomousRunReport[];
+  recentAuditEvents: AutonomousAuditEventRecord[];
+}
+
+export type ResearchChatPersona = 'synthesizer' | 'protocol' | 'simulation';
+
+export interface ResearchChatHistoryItem {
+  role: 'user' | 'assistant';
+  text: string;
+}
+
+export interface ResearchChatResponsePayload {
+  provenanceId: string;
+  persona: ResearchChatPersona;
+  language: 'en' | 'he';
+  model: string;
+  reply: string;
+  suggestions: string[];
+  sources: RetrievedSource[];
+  durationMs: number;
+  createdAt: string;
+}
+
 
 
 

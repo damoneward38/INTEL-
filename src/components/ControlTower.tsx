@@ -24,6 +24,7 @@ interface Props {
   simError: string | null;
   onRunSimulation: () => void;
   onCancelSimulation: () => void;
+  onOpenConsole?: () => void;
 }
 
 export default function ControlTower({
@@ -38,6 +39,7 @@ export default function ControlTower({
   simError,
   onRunSimulation,
   onCancelSimulation,
+  onOpenConsole,
 }: Props) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
@@ -63,16 +65,28 @@ export default function ControlTower({
           <h2 className="text-sm font-semibold text-slate-100">
             {t('command.title')}
           </h2>
-          <select
-            value={depth}
-            onChange={(e) => setDepth(e.target.value as ResearchDepth)}
-            aria-label={t('command.depth')}
-            className="rounded-md border border-slate-700 bg-[#07090E] px-2.5 py-1 text-xs text-slate-200 max-w-[190px] truncate"
-          >
-            <option value="standard">{t('command.depths.standard')}</option>
-            <option value="deep">{t('command.depths.deep')}</option>
-            <option value="comprehensive">{t('command.depths.comprehensive')}</option>
-          </select>
+          <div className="flex items-center gap-2">
+            {onOpenConsole && (
+              <button
+                type="button"
+                data-testid="safe-ui-test"
+                onClick={onOpenConsole}
+                className="px-2 py-1 text-[11px] font-medium rounded-md border border-cyan-500/40 bg-cyan-500/10 text-cyan-200 hover:bg-cyan-500/20 whitespace-nowrap"
+              >
+                {language === 'he' ? 'פתח קונסולה מלאה' : 'Full Voice Console'}
+              </button>
+            )}
+            <select
+              value={depth}
+              onChange={(e) => setDepth(e.target.value as ResearchDepth)}
+              aria-label={t('command.depth')}
+              className="rounded-md border border-slate-700 bg-[#07090E] px-2.5 py-1 text-xs text-slate-200 max-w-[160px] truncate"
+            >
+              <option value="standard">{t('command.depths.standard')}</option>
+              <option value="deep">{t('command.depths.deep')}</option>
+              <option value="comprehensive">{t('command.depths.comprehensive')}</option>
+            </select>
+          </div>
         </div>
 
         <textarea

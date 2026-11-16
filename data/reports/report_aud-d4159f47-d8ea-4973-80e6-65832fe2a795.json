@@ -1,0 +1,127 @@
+{
+  "auditUuid": "aud-d4159f47-d8ea-4973-80e6-65832fe2a795",
+  "auditLogPath": "data/orchestrator_audit.jsonl",
+  "reportPath": "data/reports/report_aud-d4159f47-d8ea-4973-80e6-65832fe2a795.json",
+  "simulatorEnabled": true,
+  "evaluationStatus": "evaluated",
+  "physicalExecution": false,
+  "filename": "kinetics_e2e.csv",
+  "uploadId": "upl-32290436-7",
+  "language": "en",
+  "entitiesCount": 0,
+  "embeddingSource": "tfidf-hash-64d",
+  "embeddingDimensions": 64,
+  "protocolId": "proto-687c1f59",
+  "proposalId": "prop-6babdbab",
+  "simulationJobId": "sim-17392800",
+  "simulationEngine": "langevin-md",
+  "reward": 0.5345,
+  "safetyPassed": true,
+  "locked": false,
+  "slackAlertSent": false,
+  "stages": [
+    {
+      "stage": "ingest",
+      "status": "completed",
+      "durationMs": 0,
+      "summary": "Ingested \"kinetics_e2e.csv\" (82 extracted bytes)",
+      "digestSha256": "77e45a7f44e30fe76f550d70174b6a103cbd0d0450fa5bed44f5a1a29ed030bf",
+      "metrics": {
+        "bytes": 82
+      }
+    },
+    {
+      "stage": "detect_lang",
+      "status": "completed",
+      "durationMs": 0,
+      "summary": "Detected primary script/language: en",
+      "digestSha256": "d7ad671fbb743cba8198469f8b00b9be84e4bc8608bc55525722bc718400f669",
+      "metrics": {
+        "language": "en"
+      }
+    },
+    {
+      "stage": "extract_entities",
+      "status": "completed",
+      "durationMs": 1,
+      "summary": "Extracted 0 structured entities (baseline pattern/keyword extractor)",
+      "digestSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "metrics": {
+        "entitiesCount": 0
+      }
+    },
+    {
+      "stage": "embed_text",
+      "status": "completed",
+      "durationMs": 3,
+      "summary": "Generated 64-dim context vector via tfidf-hash-64d",
+      "digestSha256": "6938969227a8ec7376f2e00425db633e27e88c0a4841d604218af47378404fea",
+      "metrics": {
+        "dimensions": 64,
+        "source": "tfidf-hash-64d"
+      }
+    },
+    {
+      "stage": "link_graph",
+      "status": "completed",
+      "durationMs": 2,
+      "summary": "Linked 0 entities into graph node aodoc-1fa02f51",
+      "digestSha256": "cb077e5c7cb38714f3ff0fa05caa4d9b0a9e86c4a4560dc2b3ac1a6a171a82f4",
+      "metrics": {
+        "documentId": "aodoc-1fa02f51",
+        "entitiesCount": 0
+      }
+    },
+    {
+      "stage": "plan_policy",
+      "status": "completed",
+      "durationMs": 1,
+      "summary": "Approved protocol proto-687c1f59 and proposed bounded step thermostat_gamma=1.2 [software_only]",
+      "digestSha256": "87a492417ed9dc4d8ac03be8896e45585c367e17fc4cc6402c062af2cbd23c39",
+      "metrics": {
+        "protocolId": "proto-687c1f59",
+        "proposalId": "prop-6babdbab",
+        "proposedValue": 1.2
+      }
+    },
+    {
+      "stage": "execute",
+      "status": "completed",
+      "durationMs": 1370,
+      "summary": "Isolated worker langevin-md (sim-17392800) completed 41 frames, final RMSD=1.2436",
+      "digestSha256": "c6893d64b8f2a356142ef255971d0f3d81a5fa6b461aaeb7df8b34f07ee2b953",
+      "metrics": {
+        "jobId": "sim-17392800",
+        "frames": 41,
+        "finalRmsd": 1.2436
+      }
+    },
+    {
+      "stage": "evaluate",
+      "status": "completed",
+      "durationMs": 1,
+      "summary": "Evaluated constrained reward=0.5345 (safety=0.94 >= 0.75)",
+      "digestSha256": "65c7dac4566ad4e264be08a4a220d4481085cb24a580248ad852156764d7705e",
+      "metrics": {
+        "reward": 0.5345,
+        "safety": 0.94,
+        "efficiency": 0.565,
+        "isNewBest": true
+      }
+    },
+    {
+      "stage": "learn_and_lock",
+      "status": "completed",
+      "durationMs": 0,
+      "summary": "Protocol not locked (PI/Auditor required); wrote data/reports/report_aud-d4159f47-d8ea-4973-80e6-65832fe2a795.json",
+      "digestSha256": "e66f2c1998a78fe33c9d6e75923bc71895ea70abe9eadb9a8cdffba7a6ad68ef",
+      "metrics": {
+        "locked": false,
+        "slackAlertSent": false,
+        "reportPath": "data/reports/report_aud-d4159f47-d8ea-4973-80e6-65832fe2a795.json"
+      }
+    }
+  ],
+  "reportMarkdown": "# INTEL Master Orchestrator Report\n- **Audit UUID**: `aud-d4159f47-d8ea-4973-80e6-65832fe2a795`\n- **Report File**: `data/reports/report_aud-d4159f47-d8ea-4973-80e6-65832fe2a795.json`\n- **Artifact**: `kinetics_e2e.csv` (en)\n- **Physical Execution**: `false`\n- **Simulator Enabled**: `true`\n- **Entities Linked**: 0 (node `aodoc-1fa02f51`)\n- **Context Vector**: 64d via `tfidf-hash-64d`\n- **Protocol**: `proto-687c1f59` (thermostat_gamma=1.2)\n- **Simulation Worker**: `langevin-md` (`sim-17392800`), Final RMSD=1.2436\n- **Constrained Reward**: **0.5345** (Safety=PASS)\n- **Registry Lock**: NOT_LOCKED\n- **Timestamp**: 2026-11-16T13:18:17.155Z",
+  "createdAt": "2026-11-16T13:18:17.155Z"
+}

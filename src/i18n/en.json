@@ -3,6 +3,8 @@
   "brandHe": "אינטל",
   "nav": {
     "workspace": "Command Center",
+    "console": "Research Console",
+    "pipeline": "3D Pipeline OS",
     "upload": "All-Upload",
     "knowledge": "Knowledge & 3D",
     "lab": "Lab & Synthesis",
@@ -18,6 +20,7 @@
       "grants": "Grant Drafts",
       "pgx": "Pharmacogenomics Vault",
       "optimize": "AutoOptimizeAI",
+      "autonomous": "Autonomous Loop",
       "orchestrator": "Master Orchestrator",
       "provenance": "Provenance & Licenses",
       "eco": "Eco-Impact Auditor",

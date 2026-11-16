@@ -4,6 +4,8 @@ import type { AuthSession, WhiteLabelConfig } from '../types';
 
 export type AppView =
   | 'workspace'
+  | 'console'
+  | 'pipeline'
   | 'upload'
   | 'knowledge'
   | 'lab'
@@ -23,6 +25,8 @@ interface Props {
 
 const HUB_KEYS: AppView[] = [
   'workspace',
+  'console',
+  'pipeline',
   'upload',
   'knowledge',
   'lab',
