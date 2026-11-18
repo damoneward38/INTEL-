@@ -1,0 +1,177 @@
+[
+  {
+    "job_id": "d814b435-4e52-4374-ba0d-430640fa6c91",
+    "sequence": 1,
+    "timestamp": 1794981531.5859673,
+    "stage": "configuration_validation",
+    "status": "running",
+    "details": {}
+  },
+  {
+    "job_id": "d814b435-4e52-4374-ba0d-430640fa6c91",
+    "sequence": 2,
+    "timestamp": 1794981531.5860372,
+    "stage": "configuration_validation",
+    "status": "completed",
+    "details": {
+      "robot_type": "differential_drive",
+      "planner": "potential_field",
+      "simulation_only": true
+    }
+  },
+  {
+    "job_id": "d814b435-4e52-4374-ba0d-430640fa6c91",
+    "sequence": 3,
+    "timestamp": 1794981531.5860615,
+    "stage": "simulation",
+    "status": "running",
+    "details": {
+      "robot_type": "differential_drive",
+      "planner": "potential_field",
+      "trials": 5
+    }
+  },
+  {
+    "job_id": "d814b435-4e52-4374-ba0d-430640fa6c91",
+    "sequence": 4,
+    "timestamp": 1794981531.586613,
+    "stage": "simulation_trial",
+    "status": "completed",
+    "details": {
+      "trial": 1,
+      "planner": "potential_field",
+      "completed": true,
+      "duration_s": 7.5,
+      "path_length_m": 6.375,
+      "final_error_m": 0.0554,
+      "energy_wh": 0.07125,
+      "collision_events": 0,
+      "final_position": [
+        3.9578,
+        3.9641
+      ],
+      "min_clearance_m": 0.3124
+    }
+  },
+  {
+    "job_id": "d814b435-4e52-4374-ba0d-430640fa6c91",
+    "sequence": 5,
+    "timestamp": 1794981531.5873344,
+    "stage": "simulation_trial",
+    "status": "completed",
+    "details": {
+      "trial": 2,
+      "planner": "potential_field",
+      "completed": true,
+      "duration_s": 7.5,
+      "path_length_m": 6.375,
+      "final_error_m": 0.0537,
+      "energy_wh": 0.07125,
+      "collision_events": 0,
+      "final_position": [
+        3.9572,
+        3.9675
+      ],
+      "min_clearance_m": 0.311
+    }
+  },
+  {
+    "job_id": "d814b435-4e52-4374-ba0d-430640fa6c91",
+    "sequence": 6,
+    "timestamp": 1794981531.5877934,
+    "stage": "simulation_trial",
+    "status": "completed",
+    "details": {
+      "trial": 3,
+      "planner": "potential_field",
+      "completed": true,
+      "duration_s": 7.5,
+      "path_length_m": 6.375,
+      "final_error_m": 0.0485,
+      "energy_wh": 0.07125,
+      "collision_events": 0,
+      "final_position": [
+        3.9613,
+        3.9708
+      ],
+      "min_clearance_m": 0.31
+    }
+  },
+  {
+    "job_id": "d814b435-4e52-4374-ba0d-430640fa6c91",
+    "sequence": 7,
+    "timestamp": 1794981531.5881774,
+    "stage": "simulation_trial",
+    "status": "completed",
+    "details": {
+      "trial": 4,
+      "planner": "potential_field",
+      "completed": true,
+      "duration_s": 7.1,
+      "path_length_m": 6.035,
+      "final_error_m": 0.0295,
+      "energy_wh": 0.06745,
+      "collision_events": 0,
+      "final_position": [
+        3.9744,
+        3.9853
+      ],
+      "min_clearance_m": 0.4069
+    }
+  },
+  {
+    "job_id": "d814b435-4e52-4374-ba0d-430640fa6c91",
+    "sequence": 8,
+    "timestamp": 1794981531.5886047,
+    "stage": "simulation_trial",
+    "status": "completed",
+    "details": {
+      "trial": 5,
+      "planner": "potential_field",
+      "completed": true,
+      "duration_s": 7.5,
+      "path_length_m": 6.375,
+      "final_error_m": 0.0519,
+      "energy_wh": 0.07125,
+      "collision_events": 0,
+      "final_position": [
+        3.9578,
+        3.9698
+      ],
+      "min_clearance_m": 0.3108
+    }
+  },
+  {
+    "job_id": "d814b435-4e52-4374-ba0d-430640fa6c91",
+    "sequence": 9,
+    "timestamp": 1794981531.5886676,
+    "stage": "simulation",
+    "status": "completed",
+    "details": {
+      "completed_trials": 5
+    }
+  },
+  {
+    "job_id": "d814b435-4e52-4374-ba0d-430640fa6c91",
+    "sequence": 10,
+    "timestamp": 1794981531.5886872,
+    "stage": "evaluation",
+    "status": "running",
+    "details": {}
+  },
+  {
+    "job_id": "d814b435-4e52-4374-ba0d-430640fa6c91",
+    "sequence": 11,
+    "timestamp": 1794981531.5888593,
+    "stage": "evaluation",
+    "status": "completed",
+    "details": {
+      "score": 95.15,
+      "completion_rate": 1.0,
+      "mean_error_m": 0.0478,
+      "mean_energy_wh": 0.07049,
+      "mean_path_length_m": 6.307,
+      "collision_events": 0
+    }
+  }
+]

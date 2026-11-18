@@ -15,7 +15,7 @@
       "auditRetentionDays": 365
     },
     "updatedBy": "usr-pi-01",
-    "updatedAt": "2026-11-16T13:49:43.627Z"
+    "updatedAt": "2026-11-18T06:02:42.321Z"
   },
   "launchChecklist": [
     {
@@ -51,12 +51,12 @@
   ],
   "checkoutOrders": [
     {
-      "orderId": "ord-9241cacf",
+      "orderId": "ord-f9357d93",
       "invoiceNumber": "INV-2026-1002",
-      "buyerUserId": "usr-275a1bb0",
+      "buyerUserId": "usr-bd498a71",
       "buyerRole": "researcher",
       "organization": "BioSystems Pilot Team",
-      "billingEmail": "researcher.1794836978220@biolab-e2e.org",
+      "billingEmail": "researcher.1794981756965@biolab-e2e.org",
       "partnerName": "BioSystems Pilot Team",
       "tier": "starter",
       "tierName": "Starter",
@@ -68,16 +68,16 @@
       "contractTotalUsd": 3229,
       "paymentMode": "internal_sandbox_ledger",
       "billingNotice": "Recorded in internal sandbox billing ledger (no external Stripe/bank card charge executed without STRIPE_SECRET_KEY).",
-      "receiptDigestSha256": "06796d9a426e81df87740ffd02b9cb65b28d16c6c70416288fc6ccbacd9c7b74",
-      "createdAt": "2026-11-16T13:49:39.705Z"
+      "receiptDigestSha256": "003ce5f6daad9304648ec4658da05fb57c4a838a29a48dd67f346fcfad510c21",
+      "createdAt": "2026-11-18T06:02:38.439Z"
     },
     {
-      "orderId": "ord-e82b7eca",
+      "orderId": "ord-2fec0801",
       "invoiceNumber": "INV-2026-1001",
-      "buyerUserId": "usr-275a1bb0",
+      "buyerUserId": "usr-bd498a71",
       "buyerRole": "researcher",
       "organization": "BioSystems E2E Lab",
-      "billingEmail": "researcher.1794836978220@biolab-e2e.org",
+      "billingEmail": "researcher.1794981756965@biolab-e2e.org",
       "partnerName": "BioSystems Consortium Partner",
       "tier": "growth",
       "tierName": "Growth",
@@ -89,42 +89,42 @@
       "contractTotalUsd": 2998,
       "paymentMode": "internal_sandbox_ledger",
       "billingNotice": "Recorded in internal sandbox billing ledger (no external Stripe/bank card charge executed without STRIPE_SECRET_KEY).",
-      "receiptDigestSha256": "de22704b4ffbcf20a1d51fb3b106dcce535a0e82f4817efd1645a3a28062d48b",
-      "createdAt": "2026-11-16T13:49:39.697Z"
+      "receiptDigestSha256": "30463f2d3e47ba386599e2f0796c34af15a63fdb9c9ec50f9d49602246ea41a4",
+      "createdAt": "2026-11-18T06:02:38.430Z"
     }
   ],
   "partnerPayouts": [
     {
-      "payoutId": "pay-3df038c8",
-      "orderId": "ord-9241cacf",
+      "payoutId": "pay-92c23b0f",
+      "orderId": "ord-f9357d93",
       "invoiceNumber": "INV-2026-1002",
       "partnerName": "BioSystems Pilot Team",
-      "partnerEmail": "researcher.1794836978220@biolab-e2e.org",
+      "partnerEmail": "researcher.1794981756965@biolab-e2e.org",
       "grossUsd": 3229,
       "platformShareUsd": 1775.95,
       "partnerShareUsd": 1453.05,
       "splitRatio": "55/45",
       "status": "pending_payout",
       "settlementMode": "internal_sandbox_ledger",
-      "createdAt": "2026-11-16T13:49:39.705Z"
+      "createdAt": "2026-11-18T06:02:38.439Z"
     },
     {
-      "payoutId": "pay-5ad152c1",
-      "orderId": "ord-e82b7eca",
+      "payoutId": "pay-a168bd05",
+      "orderId": "ord-2fec0801",
       "invoiceNumber": "INV-2026-1001",
       "partnerName": "BioSystems Consortium Partner",
-      "partnerEmail": "researcher.1794836978220@biolab-e2e.org",
+      "partnerEmail": "researcher.1794981756965@biolab-e2e.org",
       "grossUsd": 2998,
       "platformShareUsd": 1648.9,
       "partnerShareUsd": 1349.1,
       "splitRatio": "55/45",
       "status": "settled",
       "settlementMode": "internal_sandbox_ledger",
-      "createdAt": "2026-11-16T13:49:39.697Z",
-      "settledBy": "usr-13752f69",
-      "settledAt": "2026-11-16T13:49:39.716Z",
-      "settlementReference": "STL-EA7B9D7A"
+      "createdAt": "2026-11-18T06:02:38.430Z",
+      "settledBy": "usr-834e6889",
+      "settledAt": "2026-11-18T06:02:38.451Z",
+      "settlementReference": "STL-6FC22B42"
     }
   ],
-  "persistedAt": "2026-11-16T13:49:43.715Z"
+  "persistedAt": "2026-11-18T06:02:42.466Z"
 }

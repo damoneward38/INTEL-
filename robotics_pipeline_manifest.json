@@ -1,6 +1,6 @@
 {
   "domain": "robotics",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "execution_mode": "virtual_simulation_only",
   "pipeline": [
     "research_ingestion",
@@ -30,7 +30,12 @@
   ],
   "supported_initial_models": [
     "differential_drive",
-    "two_link_arm"
+    "two_link_arm",
+    "quadrotor_3d"
+  ],
+  "supported_planners": [
+    "straight_line",
+    "potential_field"
   ],
   "future_simulator_adapters": [
     {

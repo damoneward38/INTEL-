@@ -190,6 +190,8 @@ export async function fetchPipelineHealthApi(): Promise<{
   return pipelineFetch('/api/health');
 }
 
+export type RoboticsCoord = [number, number] | [number, number, number];
+
 export interface RoboticsResearchConfig {
   research?: {
     title?: string;
@@ -200,7 +202,7 @@ export interface RoboticsResearchConfig {
   };
   robot: {
     name: string;
-    robot_type: 'differential_drive' | 'two_link_arm';
+    robot_type: 'differential_drive' | 'two_link_arm' | 'quadrotor_3d';
     wheel_radius?: number;
     wheel_base?: number;
     max_speed?: number;
@@ -210,6 +212,9 @@ export interface RoboticsResearchConfig {
     arm_link_1_m?: number;
     arm_link_2_m?: number;
     joint_limit_deg?: number;
+    elbow_config?: 'elbow_down' | 'elbow_up';
+    rotor_count?: number;
+    cruise_altitude_m?: number;
   };
   simulation?: {
     duration_s?: number;
@@ -218,11 +223,13 @@ export interface RoboticsResearchConfig {
     obstacle_margin_m?: number;
     target_tolerance_m?: number;
     seed?: number;
+    planner?: 'straight_line' | 'potential_field';
   };
   environment?: {
-    start?: [number, number];
-    goal?: [number, number];
-    obstacles?: Array<{ center: [number, number]; radius: number }>;
+    start?: RoboticsCoord;
+    goal?: RoboticsCoord;
+    waypoints?: RoboticsCoord[];
+    obstacles?: Array<{ center: [number, number]; radius: number; height_m?: number }>;
     target?: [number, number];
   };
   objectives?: string[];
@@ -234,13 +241,16 @@ export interface RoboticsPipelineManifest {
   execution_mode: string;
   pipeline: string[];
   supported_initial_models: string[];
+  supported_planners?: string[];
   future_simulator_adapters: Array<{
     name: string;
     purpose: string;
     enabled: boolean;
   }>;
+  result_integrity?: Record<string, boolean>;
   hardware_execution: {
     enabled: boolean;
+    requires_separate_hardware_integration?: boolean;
     requires_human_approval: boolean;
     requires_independent_safety_validation: boolean;
   };
@@ -273,7 +283,9 @@ export async function fetchRoboticsRunsApi(): Promise<{
   runs: RoboticsReportRecord[];
   presets: {
     differential_drive: RoboticsResearchConfig;
+    potential_field?: RoboticsResearchConfig;
     two_link_arm: RoboticsResearchConfig;
+    quadrotor_3d?: RoboticsResearchConfig;
     research_upload_example?: RoboticsResearchConfig;
   };
   manifest?: RoboticsPipelineManifest;
@@ -297,6 +309,88 @@ export async function runRoboticsEngineApi(config: RoboticsResearchConfig): Prom
   return pipelineFetch('/api/robotics/run', {
     method: 'POST',
     body: JSON.stringify(config),
+  });
+}
+
+export interface MatrixComparisonPreset {
+  id: string;
+  title: string;
+  domain: string;
+  simulatorId: string;
+  matrices: Array<{
+    name: string;
+    rows: Array<Record<string, number | string>>;
+  }>;
+}
+
+export interface MatrixParameterDiffSummary {
+  parameter: string;
+  unit: string;
+  bounds: [number, number] | null;
+  min: number;
+  max: number;
+  mean: number;
+  spread: number;
+  presentInMatrices: string[];
+  missingInMatrices: string[];
+  matrixMeans: Record<string, number | null>;
+  deltaVsFirstMatrix: Record<string, number | null>;
+}
+
+export interface MatrixEvaluatedCandidate {
+  matrixName: string;
+  rowIndex: number;
+  candidateId: string;
+  label: string;
+  parameters: Record<string, number>;
+  metrics: {
+    stabilityScore: number;
+    safetyScore: number;
+    yieldScore: number;
+    energyDrift: number;
+    compositeScore: number;
+  };
+  confidenceInterval95: [number, number];
+  status: 'accepted' | 'rejected' | 'selected';
+  paretoOptimal: boolean;
+  constraintViolations: string[];
+  deltaFromBaseline: Record<string, number>;
+  rationale: string;
+  recommendedFix: string | null;
+}
+
+export interface MatrixComparisonResult {
+  comparisonId: string;
+  createdAt: string;
+  domain: string;
+  simulatorId: string;
+  simulatorName: string;
+  replicatesPerCandidate: number;
+  matrixNames: string[];
+  parameterDiffs: MatrixParameterDiffSummary[];
+  evaluatedCandidates: MatrixEvaluatedCandidate[];
+  paretoCandidateIds: string[];
+  winnerCandidateId: string | null;
+  roboticsVerificationReport: RoboticsReportRecord | null;
+  sha256: string;
+}
+
+export async function fetchMatrixPresetsApi(): Promise<{
+  presets: MatrixComparisonPreset[];
+}> {
+  return pipelineFetch('/api/pipeline/matrix-presets');
+}
+
+export async function compareMatricesApi(payload: {
+  matrices: Array<{ name: string; rows: Array<Record<string, number | string>> }>;
+  domain?: string;
+  simulatorId?: string;
+  replicates?: number;
+  verifyWithRoboticsPython?: boolean;
+}): Promise<{ comparison: MatrixComparisonResult }> {
+  return pipelineFetch('/api/pipeline/compare-matrices', {
+    method: 'POST',
+    body: JSON.stringify(payload),
   });
 }
 

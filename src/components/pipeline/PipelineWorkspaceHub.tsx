@@ -30,6 +30,7 @@ import { triggerFileDownload } from '../../utils/exportReport';
 import type { UserRole } from '../../types';
 import Pipeline3DCanvas from './Pipeline3DCanvas';
 import RoboticsSimulationPanel from './RoboticsSimulationPanel';
+import MatrixComparatorPanel from './MatrixComparatorPanel';
 
 export type PipelineSubRoute =
   | '/command-center'
@@ -92,9 +93,14 @@ const EXAMPLE_COMMANDS = [
     text: 'What does our safety policy say about thermal drift in virtual molecular ensembles?',
   },
   {
-    label: 'Robotics Simulation',
+    label: 'Robotics Avoidance',
     mode: 'matrix' as const,
-    text: 'Run differential_drive robotics virtual simulation optimizing max_speed and obstacle_margin_m.',
+    text: 'Run differential_drive potential_field obstacle avoidance robotics virtual simulation optimizing max_speed and obstacle_margin_m.',
+  },
+  {
+    label: '3D Quadrotor Flight',
+    mode: 'matrix' as const,
+    text: 'Simulate quadrotor_3d potential_field waypoint trajectory optimizing max_speed, obstacle_margin_m, and battery reserve.',
   },
 ];
 
@@ -822,6 +828,14 @@ export default function PipelineWorkspaceHub({
               ))}
             </tbody>
           </table>
+          <MatrixComparatorPanel
+            onLaunchWinnerInPipeline={(cmd, matrixJson) => {
+              setCommandText(cmd);
+              setInlineDataText(matrixJson);
+              setInputMode('matrix');
+              onRouteChange('/command-center');
+            }}
+          />
         </div>
       )}
 

@@ -1,0 +1,177 @@
+[
+  {
+    "job_id": "d139e818-5f52-4f4e-b477-49d2fd92f608",
+    "sequence": 1,
+    "timestamp": 1794981755.5473347,
+    "stage": "configuration_validation",
+    "status": "running",
+    "details": {}
+  },
+  {
+    "job_id": "d139e818-5f52-4f4e-b477-49d2fd92f608",
+    "sequence": 2,
+    "timestamp": 1794981755.5474231,
+    "stage": "configuration_validation",
+    "status": "completed",
+    "details": {
+      "robot_type": "differential_drive",
+      "planner": "straight_line",
+      "simulation_only": true
+    }
+  },
+  {
+    "job_id": "d139e818-5f52-4f4e-b477-49d2fd92f608",
+    "sequence": 3,
+    "timestamp": 1794981755.547453,
+    "stage": "simulation",
+    "status": "running",
+    "details": {
+      "robot_type": "differential_drive",
+      "planner": "straight_line",
+      "trials": 5
+    }
+  },
+  {
+    "job_id": "d139e818-5f52-4f4e-b477-49d2fd92f608",
+    "sequence": 4,
+    "timestamp": 1794981755.5478172,
+    "stage": "simulation_trial",
+    "status": "completed",
+    "details": {
+      "trial": 1,
+      "planner": "straight_line",
+      "completed": false,
+      "duration_s": 2.9,
+      "path_length_m": 2.4,
+      "final_error_m": 3.2569,
+      "energy_wh": 0.028,
+      "collision_events": 1,
+      "final_position": [
+        1.6971,
+        1.6971
+      ],
+      "min_clearance_m": 0.1284
+    }
+  },
+  {
+    "job_id": "d139e818-5f52-4f4e-b477-49d2fd92f608",
+    "sequence": 5,
+    "timestamp": 1794981755.548064,
+    "stage": "simulation_trial",
+    "status": "completed",
+    "details": {
+      "trial": 2,
+      "planner": "straight_line",
+      "completed": false,
+      "duration_s": 2.9,
+      "path_length_m": 2.4,
+      "final_error_m": 3.2569,
+      "energy_wh": 0.028,
+      "collision_events": 1,
+      "final_position": [
+        1.6971,
+        1.6971
+      ],
+      "min_clearance_m": 0.1284
+    }
+  },
+  {
+    "job_id": "d139e818-5f52-4f4e-b477-49d2fd92f608",
+    "sequence": 6,
+    "timestamp": 1794981755.5482051,
+    "stage": "simulation_trial",
+    "status": "completed",
+    "details": {
+      "trial": 3,
+      "planner": "straight_line",
+      "completed": false,
+      "duration_s": 2.9,
+      "path_length_m": 2.4,
+      "final_error_m": 3.2569,
+      "energy_wh": 0.028,
+      "collision_events": 1,
+      "final_position": [
+        1.6971,
+        1.6971
+      ],
+      "min_clearance_m": 0.1284
+    }
+  },
+  {
+    "job_id": "d139e818-5f52-4f4e-b477-49d2fd92f608",
+    "sequence": 7,
+    "timestamp": 1794981755.5483444,
+    "stage": "simulation_trial",
+    "status": "completed",
+    "details": {
+      "trial": 4,
+      "planner": "straight_line",
+      "completed": false,
+      "duration_s": 2.9,
+      "path_length_m": 2.4,
+      "final_error_m": 3.2569,
+      "energy_wh": 0.028,
+      "collision_events": 1,
+      "final_position": [
+        1.6971,
+        1.6971
+      ],
+      "min_clearance_m": 0.1284
+    }
+  },
+  {
+    "job_id": "d139e818-5f52-4f4e-b477-49d2fd92f608",
+    "sequence": 8,
+    "timestamp": 1794981755.5484746,
+    "stage": "simulation_trial",
+    "status": "completed",
+    "details": {
+      "trial": 5,
+      "planner": "straight_line",
+      "completed": false,
+      "duration_s": 2.9,
+      "path_length_m": 2.4,
+      "final_error_m": 3.2569,
+      "energy_wh": 0.028,
+      "collision_events": 1,
+      "final_position": [
+        1.6971,
+        1.6971
+      ],
+      "min_clearance_m": 0.1284
+    }
+  },
+  {
+    "job_id": "d139e818-5f52-4f4e-b477-49d2fd92f608",
+    "sequence": 9,
+    "timestamp": 1794981755.548537,
+    "stage": "simulation",
+    "status": "completed",
+    "details": {
+      "completed_trials": 5
+    }
+  },
+  {
+    "job_id": "d139e818-5f52-4f4e-b477-49d2fd92f608",
+    "sequence": 10,
+    "timestamp": 1794981755.5485592,
+    "stage": "evaluation",
+    "status": "running",
+    "details": {}
+  },
+  {
+    "job_id": "d139e818-5f52-4f4e-b477-49d2fd92f608",
+    "sequence": 11,
+    "timestamp": 1794981755.5487235,
+    "stage": "evaluation",
+    "status": "completed",
+    "details": {
+      "score": 0.0,
+      "completion_rate": 0.0,
+      "mean_error_m": 3.2569,
+      "mean_energy_wh": 0.028,
+      "mean_path_length_m": 2.4,
+      "collision_events": 5
+    }
+  }
+]

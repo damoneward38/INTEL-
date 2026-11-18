@@ -1,0 +1,188 @@
+[
+  {
+    "job_id": "636cc044-d2d6-47fc-838b-61b86af74941",
+    "sequence": 1,
+    "timestamp": 1794981531.4608302,
+    "stage": "configuration_validation",
+    "status": "running",
+    "details": {}
+  },
+  {
+    "job_id": "636cc044-d2d6-47fc-838b-61b86af74941",
+    "sequence": 2,
+    "timestamp": 1794981531.4609005,
+    "stage": "configuration_validation",
+    "status": "completed",
+    "details": {
+      "robot_type": "quadrotor_3d",
+      "planner": "potential_field",
+      "simulation_only": true
+    }
+  },
+  {
+    "job_id": "636cc044-d2d6-47fc-838b-61b86af74941",
+    "sequence": 3,
+    "timestamp": 1794981531.4609265,
+    "stage": "simulation",
+    "status": "running",
+    "details": {
+      "robot_type": "quadrotor_3d",
+      "planner": "potential_field",
+      "trials": 5
+    }
+  },
+  {
+    "job_id": "636cc044-d2d6-47fc-838b-61b86af74941",
+    "sequence": 4,
+    "timestamp": 1794981531.464332,
+    "stage": "simulation_trial",
+    "status": "completed",
+    "details": {
+      "trial": 1,
+      "planner": "potential_field",
+      "completed": true,
+      "duration_s": 6.2,
+      "path_length_m": 8.4,
+      "final_error_m": 0.1102,
+      "energy_wh": 0.339294,
+      "battery_remaining_pct": 99.64,
+      "collision_events": 0,
+      "final_position": [
+        4.9525,
+        4.0033,
+        1.2995
+      ],
+      "min_clearance_m": 0.4459
+    }
+  },
+  {
+    "job_id": "636cc044-d2d6-47fc-838b-61b86af74941",
+    "sequence": 5,
+    "timestamp": 1794981531.4697409,
+    "stage": "simulation_trial",
+    "status": "completed",
+    "details": {
+      "trial": 2,
+      "planner": "potential_field",
+      "completed": true,
+      "duration_s": 6.2,
+      "path_length_m": 8.4,
+      "final_error_m": 0.1063,
+      "energy_wh": 0.339296,
+      "battery_remaining_pct": 99.64,
+      "collision_events": 0,
+      "final_position": [
+        4.9527,
+        4.0053,
+        1.295
+      ],
+      "min_clearance_m": 0.4465
+    }
+  },
+  {
+    "job_id": "636cc044-d2d6-47fc-838b-61b86af74941",
+    "sequence": 6,
+    "timestamp": 1794981531.4735916,
+    "stage": "simulation_trial",
+    "status": "completed",
+    "details": {
+      "trial": 3,
+      "planner": "potential_field",
+      "completed": true,
+      "duration_s": 6.2,
+      "path_length_m": 8.4,
+      "final_error_m": 0.1093,
+      "energy_wh": 0.339295,
+      "battery_remaining_pct": 99.64,
+      "collision_events": 0,
+      "final_position": [
+        4.9514,
+        4.0052,
+        1.2977
+      ],
+      "min_clearance_m": 0.4452
+    }
+  },
+  {
+    "job_id": "636cc044-d2d6-47fc-838b-61b86af74941",
+    "sequence": 7,
+    "timestamp": 1794981531.4743743,
+    "stage": "simulation_trial",
+    "status": "completed",
+    "details": {
+      "trial": 4,
+      "planner": "potential_field",
+      "completed": true,
+      "duration_s": 6.2,
+      "path_length_m": 8.4,
+      "final_error_m": 0.1064,
+      "energy_wh": 0.339295,
+      "battery_remaining_pct": 99.64,
+      "collision_events": 0,
+      "final_position": [
+        4.95,
+        4.0083,
+        1.2935
+      ],
+      "min_clearance_m": 0.448
+    }
+  },
+  {
+    "job_id": "636cc044-d2d6-47fc-838b-61b86af74941",
+    "sequence": 8,
+    "timestamp": 1794981531.4748855,
+    "stage": "simulation_trial",
+    "status": "completed",
+    "details": {
+      "trial": 5,
+      "planner": "potential_field",
+      "completed": true,
+      "duration_s": 6.2,
+      "path_length_m": 8.4,
+      "final_error_m": 0.1099,
+      "energy_wh": 0.339295,
+      "battery_remaining_pct": 99.64,
+      "collision_events": 0,
+      "final_position": [
+        4.9503,
+        4.0063,
+        1.2978
+      ],
+      "min_clearance_m": 0.4456
+    }
+  },
+  {
+    "job_id": "636cc044-d2d6-47fc-838b-61b86af74941",
+    "sequence": 9,
+    "timestamp": 1794981531.4749436,
+    "stage": "simulation",
+    "status": "completed",
+    "details": {
+      "completed_trials": 5
+    }
+  },
+  {
+    "job_id": "636cc044-d2d6-47fc-838b-61b86af74941",
+    "sequence": 10,
+    "timestamp": 1794981531.4749668,
+    "stage": "evaluation",
+    "status": "running",
+    "details": {}
+  },
+  {
+    "job_id": "636cc044-d2d6-47fc-838b-61b86af74941",
+    "sequence": 11,
+    "timestamp": 1794981531.4751923,
+    "stage": "evaluation",
+    "status": "completed",
+    "details": {
+      "score": 88.819,
+      "completion_rate": 1.0,
+      "mean_error_m": 0.1084,
+      "mean_energy_wh": 0.339295,
+      "mean_path_length_m": 8.4,
+      "collision_events": 0,
+      "mean_battery_remaining_pct": 99.64
+    }
+  }
+]

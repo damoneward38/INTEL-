@@ -14,6 +14,14 @@ import {
   selectCompatibleSimulator,
 } from './simulators.ts';
 import {
+  DEFAULT_ARM_ROBOT_CONFIG,
+  DEFAULT_AVOIDANCE_ROBOT_CONFIG,
+  DEFAULT_MOBILE_ROBOT_CONFIG,
+  DEFAULT_QUADROTOR_CONFIG,
+  runRoboticsEnginePython,
+  type RoboticsReportRecord,
+} from './roboticsBridge.ts';
+import {
   appendAuditChainEntry,
   appendJobEvent,
   getJobByIdempotencyKey,
@@ -788,7 +796,35 @@ async function executePipelineJob(jobId: string): Promise<void> {
     let completedSimCount = 0;
     let failedSimCount = 0;
 
+    let roboticsReportSummary: RoboticsReportRecord | null = null;
     await runStage(job, 'virtual-simulation', batch1.length, async (reportProgress) => {
+      if (adapter.id === 'robotics-kinematics-adapter') {
+        try {
+          const candidateJsonMatch = (upload?.extractedText || inlineData || '').trim();
+          let baseRobCfg: Record<string, unknown> = /quadrotor/i.test(combinedText)
+            ? JSON.parse(JSON.stringify(DEFAULT_QUADROTOR_CONFIG))
+            : /two_link_arm/i.test(combinedText)
+              ? JSON.parse(JSON.stringify(DEFAULT_ARM_ROBOT_CONFIG))
+              : /potential_field|avoidance/i.test(combinedText)
+                ? JSON.parse(JSON.stringify(DEFAULT_AVOIDANCE_ROBOT_CONFIG))
+                : JSON.parse(JSON.stringify(DEFAULT_MOBILE_ROBOT_CONFIG));
+          if (candidateJsonMatch.startsWith('{')) {
+            try {
+              const parsedJson = JSON.parse(candidateJsonMatch) as Record<string, unknown>;
+              if (parsedJson && typeof parsedJson === 'object' && parsedJson.robot) {
+                baseRobCfg = parsedJson;
+              }
+            } catch {
+              // Keep preset fallback
+            }
+          }
+          const pyRes = await runRoboticsEnginePython(baseRobCfg, job.createdBy.userId);
+          roboticsReportSummary = pyRes.report;
+        } catch {
+          // Record virtual replicate telemetry cleanly even if custom robotics JSON is partial
+        }
+      }
+
       for (let idx = 0; idx < batch1.length; idx += 1) {
         checkCancelled(job.jobId);
         const cand = batch1[idx];
@@ -844,7 +880,25 @@ async function executePipelineJob(jobId: string): Promise<void> {
 
       return {
         outputCount: completedSimCount,
-        summary: `Completed ${batch1.length} virtual simulations (${completedSimCount} compliant, ${failedSimCount} failed constraints).`,
+        summary: roboticsReportSummary
+          ? `Completed ${batch1.length} virtual simulations + robotics_engine.py run ${roboticsReportSummary.job_id.slice(0, 8)} (score=${String(roboticsReportSummary.evaluation.score ?? 'N/A')}).`
+          : `Completed ${batch1.length} virtual simulations (${completedSimCount} compliant, ${failedSimCount} failed constraints).`,
+        data: roboticsReportSummary
+          ? {
+              roboticsReport: {
+                job_id: roboticsReportSummary.job_id,
+                engine_version: roboticsReportSummary.engine_version,
+                simulation_only: roboticsReportSummary.simulation_only,
+                robot: roboticsReportSummary.robot,
+                simulation: roboticsReportSummary.simulation,
+                environment: roboticsReportSummary.environment,
+                trials: roboticsReportSummary.trials.slice(0, 1),
+                evaluation: roboticsReportSummary.evaluation,
+                trialCount: roboticsReportSummary.trials.length,
+                sha256: roboticsReportSummary.sha256,
+              },
+            }
+          : undefined,
       };
     });
 
@@ -1250,14 +1304,19 @@ function buildBatch1Candidates(
   if (matrix.length > 0) {
     matrix.slice(0, 4).forEach((row, i) => {
       const p: Record<string, number> = { ...baseParams };
+      const nestedRobot = (row as Record<string, unknown>).robot as Record<string, unknown> | undefined;
+      const nestedSim = (row as Record<string, unknown>).simulation as Record<string, unknown> | undefined;
       for (const v of vars) {
-        const raw = row[v.name];
+        const raw = row[v.name] ?? nestedRobot?.[v.name] ?? nestedSim?.[v.name];
         if (typeof raw === 'number' && Number.isFinite(raw)) p[v.name] = raw;
       }
       candidates.push({
         candidateId: `cand-b1-${i + 1}`,
         batch: 1,
-        label: `Matrix Row #${i + 1}`,
+        label:
+          typeof nestedRobot?.name === 'string'
+            ? `${nestedRobot.name} (Baseline Matrix)`
+            : `Matrix Row #${i + 1}`,
         parameters: p,
         status: 'pending',
         reason: 'Supplied in input parameter matrix.',
@@ -1268,6 +1327,26 @@ function buildBatch1Candidates(
         constraintViolations: [],
       });
     });
+    if (candidates.length === 1 && adapter.id === 'robotics-kinematics-adapter') {
+      const primary = vars[0];
+      const span = Math.max(1e-3, primary.max - primary.min);
+      candidates.push({
+        candidateId: 'cand-b1-2',
+        batch: 1,
+        label: 'Robotics Safety Stress Probe',
+        parameters: {
+          ...candidates[0].parameters,
+          [primary.name]: Number((primary.max + span * 0.22).toFixed(3)),
+        },
+        status: 'pending',
+        reason: 'Boundary stress probe verifying speed-limit constraint rejection.',
+        replicatesCompleted: 0,
+        replicatesTotal,
+        metrics: null,
+        confidenceInterval95: null,
+        constraintViolations: [],
+      });
+    }
   }
 
   // Ensure at least 4 informative candidates including an aggressive stress candidate to prove real failure rejection
@@ -1403,6 +1482,20 @@ function buildJobMarkdownReport(
   corpusHits: ReturnType<typeof searchCorpus>
 ): string {
   const winner = job.candidates.find((c) => c.candidateId === job.selectedCandidateId);
+  const simStageData = job.stages.find((s) => s.id === 'virtual-simulation')?.data as
+    | { roboticsReport?: Record<string, unknown> }
+    | undefined;
+  const roboticsSection = simStageData?.roboticsReport
+    ? [
+        ``,
+        `## Virtual Robotics Engine Report (\`robotics_engine.py\`)`,
+        `- **Robotics Job ID:** \`${String(simStageData.roboticsReport.job_id)}\``,
+        `- **Engine Version:** ${String(simStageData.roboticsReport.engine_version)} (\`simulation_only=${String(simStageData.roboticsReport.simulation_only)}\`)`,
+        `- **Evaluation:** \`${JSON.stringify(simStageData.roboticsReport.evaluation)}\``,
+        `- **SHA-256 Digest:** \`${String(simStageData.roboticsReport.sha256)}\``,
+      ]
+    : [];
+
   const lines = [
     `# INTEL Command Center — Verified Run Report`,
     ``,
@@ -1418,6 +1511,7 @@ function buildJobMarkdownReport(
     winner && winner.metrics
       ? `- **Winner:** ${winner.label} (\`${winner.candidateId}\`)\n- **Parameters:** \`${JSON.stringify(winner.parameters)}\`\n- **Composite Score:** ${winner.metrics.compositeScore} (95% CI: [${winner.confidenceInterval95?.[0]}, ${winner.confidenceInterval95?.[1]}])\n- **Safety Score:** ${winner.metrics.safetyScore} | **Stability:** ${winner.metrics.stabilityScore} | **Yield:** ${winner.metrics.yieldScore} | **Drift:** ${winner.metrics.energyDrift}`
       : `- Informational or blocked workflow; no experimental candidate selected.`,
+    ...roboticsSection,
     ``,
     `## Candidate Evaluation Ledger (${job.candidates.length} Candidates)`,
     ...job.candidates.map(

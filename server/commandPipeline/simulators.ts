@@ -166,8 +166,8 @@ export const SIMULATOR_ADAPTERS: SimulatorAdapterDescriptor[] = [
   },
   {
     id: 'robotics-kinematics-adapter',
-    name: 'Virtual Robotics Research Engine Adapter (Differential Drive & 2-DOF Arm)',
-    version: '1.0.0',
+    name: 'Virtual Robotics Research Engine Adapter (Rover, 2-DOF Arm & 3D Quadrotor)',
+    version: '1.1.0',
     license: 'MIT / Virtual Simulation Only (No Physical Robot Control)',
     supportedDomains: ['Robotics & Autonomous Kinematics', 'Autonomous Navigation & IK'],
     supportedInputFormats: ['text', 'json-matrix', 'csv'],
@@ -268,7 +268,7 @@ export function selectCompatibleSimulator(
     };
   }
 
-  if (/robotics|differential_drive|two_link_arm|wheel_radius|arm_link|inverse kinematics/i.test(lower)) {
+  if (/robotics|differential_drive|two_link_arm|quadrotor_3d|potential_field|wheel_radius|arm_link|inverse kinematics|obstacle_avoidance/i.test(lower)) {
     const rob = SIMULATOR_ADAPTERS[4];
     return {
       compatible: true,

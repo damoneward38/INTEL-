@@ -29,6 +29,7 @@ import PipelineWorkspaceHub, {
   PIPELINE_SUB_ROUTES,
   type PipelineSubRoute,
 } from './components/pipeline/PipelineWorkspaceHub';
+import MatrixComparatorPanel from './components/pipeline/MatrixComparatorPanel';
 import { useAuth } from './hooks/useAuth';
 import { useCorpus } from './hooks/useCorpus';
 import { useResearch } from './hooks/useResearch';
@@ -50,6 +51,7 @@ type LabTab =
   | 'pgx'
   | 'optimize'
   | 'autonomous'
+  | 'matrix'
   | 'orchestrator';
 type GovernanceTab = 'provenance' | 'eco' | 'mentor' | 'gestures';
 
@@ -266,6 +268,7 @@ export default function App() {
                   'pgx',
                   'optimize',
                   'autonomous',
+                  'matrix',
                   'orchestrator',
                 ] as const
               ).map((tab) => (
@@ -298,6 +301,11 @@ export default function App() {
               <AutonomousControllerView
                 language={language}
                 userRole={auth.session.role}
+              />
+            )}
+            {labTab === 'matrix' && (
+              <MatrixComparatorPanel
+                onLaunchWinnerInPipeline={() => navigatePipelineRoute('/command-center')}
               />
             )}
             {labTab === 'orchestrator' && (

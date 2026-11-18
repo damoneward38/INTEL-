@@ -14,6 +14,11 @@ export const ROBOTICS_CONFIGS_DIR = path.resolve(process.cwd(), 'configs');
 const ROBOTICS_MANIFEST_PATH = path.resolve(process.cwd(), 'robotics_pipeline_manifest.json');
 const PYTHON_SCRIPT_PATH = path.resolve(process.cwd(), 'robotics_engine.py');
 
+const coordTupleSchema = z.union([
+  z.tuple([z.number(), z.number()]),
+  z.tuple([z.number(), z.number(), z.number()]),
+]);
+
 export const roboticsConfigSchema = z.object({
   research: z
     .object({
@@ -26,7 +31,7 @@ export const roboticsConfigSchema = z.object({
     .optional(),
   robot: z.object({
     name: z.string().trim().min(1).max(120),
-    robot_type: z.enum(['differential_drive', 'two_link_arm']),
+    robot_type: z.enum(['differential_drive', 'two_link_arm', 'quadrotor_3d']),
     wheel_radius: z.number().positive().max(2).default(0.05),
     wheel_base: z.number().positive().max(5).default(0.3),
     max_speed: z.number().positive().max(20).default(1.0),
@@ -36,6 +41,9 @@ export const roboticsConfigSchema = z.object({
     arm_link_1_m: z.number().positive().max(10).default(0.5),
     arm_link_2_m: z.number().positive().max(10).default(0.4),
     joint_limit_deg: z.number().positive().max(360).default(150.0),
+    elbow_config: z.enum(['elbow_down', 'elbow_up']).default('elbow_down'),
+    rotor_count: z.number().int().min(1).max(16).default(4),
+    cruise_altitude_m: z.number().positive().max(100).default(2.0),
   }),
   simulation: z
     .object({
@@ -45,6 +53,7 @@ export const roboticsConfigSchema = z.object({
       obstacle_margin_m: z.number().min(0).max(10).default(0.15),
       target_tolerance_m: z.number().positive().max(5).default(0.1),
       seed: z.number().int().default(42),
+      planner: z.enum(['straight_line', 'potential_field']).default('straight_line'),
     })
     .default({
       duration_s: 20.0,
@@ -53,16 +62,19 @@ export const roboticsConfigSchema = z.object({
       obstacle_margin_m: 0.15,
       target_tolerance_m: 0.1,
       seed: 42,
+      planner: 'straight_line',
     }),
   environment: z
     .object({
-      start: z.tuple([z.number(), z.number()]).optional(),
-      goal: z.tuple([z.number(), z.number()]).optional(),
+      start: coordTupleSchema.optional(),
+      goal: coordTupleSchema.optional(),
+      waypoints: z.array(coordTupleSchema).max(64).optional(),
       obstacles: z
         .array(
           z.object({
             center: z.tuple([z.number(), z.number()]),
             radius: z.number().positive().max(50),
+            height_m: z.number().positive().max(100).optional(),
           })
         )
         .max(100)
@@ -111,6 +123,9 @@ export const DEFAULT_MOBILE_ROBOT_CONFIG: RoboticsResearchConfig = {
     arm_link_1_m: 0.5,
     arm_link_2_m: 0.4,
     joint_limit_deg: 150.0,
+    elbow_config: 'elbow_down',
+    rotor_count: 4,
+    cruise_altitude_m: 2.0,
   },
   simulation: {
     duration_s: 20,
@@ -119,6 +134,7 @@ export const DEFAULT_MOBILE_ROBOT_CONFIG: RoboticsResearchConfig = {
     obstacle_margin_m: 0.15,
     target_tolerance_m: 0.1,
     seed: 42,
+    planner: 'straight_line',
   },
   environment: {
     start: [0, 0],
@@ -138,6 +154,49 @@ export const DEFAULT_MOBILE_ROBOT_CONFIG: RoboticsResearchConfig = {
   ],
 };
 
+export const DEFAULT_AVOIDANCE_ROBOT_CONFIG: RoboticsResearchConfig = {
+  research: {
+    title: 'Obstacle-Avoidance Potential Field Navigation',
+    source: 'Extended Robotics Benchmark v1.1',
+    version: '1.1',
+    description: 'Navigate around inline obstacles using artificial potential fields + tangential curl deflection.',
+  },
+  robot: {
+    name: 'Autonomous Avoidance Rover',
+    robot_type: 'differential_drive',
+    wheel_radius: 0.05,
+    wheel_base: 0.3,
+    max_speed: 0.85,
+    max_acceleration: 0.5,
+    battery_capacity_wh: 100,
+    payload_kg: 2,
+    arm_link_1_m: 0.5,
+    arm_link_2_m: 0.4,
+    joint_limit_deg: 150.0,
+    elbow_config: 'elbow_down',
+    rotor_count: 4,
+    cruise_altitude_m: 2.0,
+  },
+  simulation: {
+    duration_s: 25,
+    timestep_s: 0.1,
+    trials: 5,
+    obstacle_margin_m: 0.15,
+    target_tolerance_m: 0.1,
+    seed: 42,
+    planner: 'potential_field',
+  },
+  environment: {
+    start: [0, 0],
+    goal: [4, 4],
+    obstacles: [
+      { center: [2, 2], radius: 0.3 },
+      { center: [3.2, 2.5], radius: 0.25 },
+    ],
+  },
+  objectives: ['navigation', 'obstacle_avoidance', 'path_planning', 'energy_efficiency'],
+};
+
 export const DEFAULT_ARM_ROBOT_CONFIG: RoboticsResearchConfig = {
   robot: {
     name: 'Two Link Research Arm',
@@ -151,6 +210,9 @@ export const DEFAULT_ARM_ROBOT_CONFIG: RoboticsResearchConfig = {
     max_acceleration: 0.5,
     battery_capacity_wh: 100,
     payload_kg: 1,
+    elbow_config: 'elbow_down',
+    rotor_count: 4,
+    cruise_altitude_m: 2.0,
   },
   simulation: {
     duration_s: 10,
@@ -159,6 +221,7 @@ export const DEFAULT_ARM_ROBOT_CONFIG: RoboticsResearchConfig = {
     obstacle_margin_m: 0.15,
     target_tolerance_m: 0.1,
     seed: 42,
+    planner: 'straight_line',
   },
   environment: {
     target: [0.5, 0.4],
@@ -168,6 +231,53 @@ export const DEFAULT_ARM_ROBOT_CONFIG: RoboticsResearchConfig = {
     'target_reachability',
     'joint_limit_validation',
   ],
+};
+
+export const DEFAULT_QUADROTOR_CONFIG: RoboticsResearchConfig = {
+  research: {
+    title: '3D Aerial Quadrotor Waypoint Inspection',
+    source: 'Extended Robotics Benchmark v1.1',
+    version: '1.1',
+    description: 'Evaluate 3D flight path planning, rotor aerodynamic energy burn, and cylindrical tower clearance.',
+  },
+  robot: {
+    name: 'Autonomous Quadrotor Inspector',
+    robot_type: 'quadrotor_3d',
+    wheel_radius: 0.05,
+    wheel_base: 0.3,
+    max_speed: 1.4,
+    max_acceleration: 1.2,
+    battery_capacity_wh: 95,
+    payload_kg: 1.2,
+    arm_link_1_m: 0.5,
+    arm_link_2_m: 0.4,
+    joint_limit_deg: 150,
+    elbow_config: 'elbow_down',
+    rotor_count: 4,
+    cruise_altitude_m: 2.4,
+  },
+  simulation: {
+    duration_s: 25,
+    timestep_s: 0.1,
+    trials: 5,
+    obstacle_margin_m: 0.2,
+    target_tolerance_m: 0.12,
+    seed: 42,
+    planner: 'potential_field',
+  },
+  environment: {
+    start: [0, 0, 0.4],
+    waypoints: [
+      [1.2, 1.5, 2.2],
+      [3.3, 2.8, 2.5],
+    ],
+    goal: [5, 4, 1.2],
+    obstacles: [
+      { center: [2.2, 1.8], radius: 0.35, height_m: 3.4 },
+      { center: [4.0, 3.2], radius: 0.3, height_m: 3.0 },
+    ],
+  },
+  objectives: ['3d_navigation', 'obstacle_avoidance', 'battery_reserve', 'altitude_stability'],
 };
 
 export const DEFAULT_RESEARCH_UPLOAD_CONFIG: RoboticsResearchConfig = {
@@ -190,6 +300,9 @@ export const DEFAULT_RESEARCH_UPLOAD_CONFIG: RoboticsResearchConfig = {
     arm_link_1_m: 0.5,
     arm_link_2_m: 0.4,
     joint_limit_deg: 150,
+    elbow_config: 'elbow_down',
+    rotor_count: 4,
+    cruise_altitude_m: 2.0,
   },
   simulation: {
     duration_s: 30,
@@ -198,6 +311,7 @@ export const DEFAULT_RESEARCH_UPLOAD_CONFIG: RoboticsResearchConfig = {
     obstacle_margin_m: 0.2,
     target_tolerance_m: 0.1,
     seed: 42,
+    planner: 'straight_line',
   },
   environment: {
     start: [0, 0],

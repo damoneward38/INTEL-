@@ -1,0 +1,265 @@
+[
+  {
+    "job_id": "65dc0200-aa64-44eb-b376-637ae2120f90",
+    "sequence": 1,
+    "timestamp": 1794981043.3602173,
+    "stage": "configuration_validation",
+    "status": "running",
+    "details": {}
+  },
+  {
+    "job_id": "65dc0200-aa64-44eb-b376-637ae2120f90",
+    "sequence": 2,
+    "timestamp": 1794981043.360304,
+    "stage": "configuration_validation",
+    "status": "completed",
+    "details": {
+      "robot_type": "differential_drive",
+      "simulation_only": true
+    }
+  },
+  {
+    "job_id": "65dc0200-aa64-44eb-b376-637ae2120f90",
+    "sequence": 3,
+    "timestamp": 1794981043.3603396,
+    "stage": "simulation",
+    "status": "running",
+    "details": {
+      "robot_type": "differential_drive",
+      "trials": 10
+    }
+  },
+  {
+    "job_id": "65dc0200-aa64-44eb-b376-637ae2120f90",
+    "sequence": 4,
+    "timestamp": 1794981043.3604813,
+    "stage": "simulation_trial",
+    "status": "completed",
+    "details": {
+      "trial": 1,
+      "completed": false,
+      "duration_s": 2.7,
+      "path_length_m": 1.68,
+      "final_error_m": 4.151,
+      "energy_wh": 0.022711,
+      "collision_events": 1,
+      "final_position": [
+        1.4406,
+        0.8644
+      ]
+    }
+  },
+  {
+    "job_id": "65dc0200-aa64-44eb-b376-637ae2120f90",
+    "sequence": 5,
+    "timestamp": 1794981043.3605652,
+    "stage": "simulation_trial",
+    "status": "completed",
+    "details": {
+      "trial": 2,
+      "completed": false,
+      "duration_s": 2.7,
+      "path_length_m": 1.68,
+      "final_error_m": 4.151,
+      "energy_wh": 0.022711,
+      "collision_events": 1,
+      "final_position": [
+        1.4406,
+        0.8644
+      ]
+    }
+  },
+  {
+    "job_id": "65dc0200-aa64-44eb-b376-637ae2120f90",
+    "sequence": 6,
+    "timestamp": 1794981043.3606362,
+    "stage": "simulation_trial",
+    "status": "completed",
+    "details": {
+      "trial": 3,
+      "completed": false,
+      "duration_s": 2.7,
+      "path_length_m": 1.68,
+      "final_error_m": 4.151,
+      "energy_wh": 0.022711,
+      "collision_events": 1,
+      "final_position": [
+        1.4406,
+        0.8644
+      ]
+    }
+  },
+  {
+    "job_id": "65dc0200-aa64-44eb-b376-637ae2120f90",
+    "sequence": 7,
+    "timestamp": 1794981043.3607063,
+    "stage": "simulation_trial",
+    "status": "completed",
+    "details": {
+      "trial": 4,
+      "completed": false,
+      "duration_s": 2.7,
+      "path_length_m": 1.68,
+      "final_error_m": 4.151,
+      "energy_wh": 0.022711,
+      "collision_events": 1,
+      "final_position": [
+        1.4406,
+        0.8644
+      ]
+    }
+  },
+  {
+    "job_id": "65dc0200-aa64-44eb-b376-637ae2120f90",
+    "sequence": 8,
+    "timestamp": 1794981043.3608088,
+    "stage": "simulation_trial",
+    "status": "completed",
+    "details": {
+      "trial": 5,
+      "completed": false,
+      "duration_s": 2.7,
+      "path_length_m": 1.68,
+      "final_error_m": 4.151,
+      "energy_wh": 0.022711,
+      "collision_events": 1,
+      "final_position": [
+        1.4406,
+        0.8644
+      ]
+    }
+  },
+  {
+    "job_id": "65dc0200-aa64-44eb-b376-637ae2120f90",
+    "sequence": 9,
+    "timestamp": 1794981043.3609014,
+    "stage": "simulation_trial",
+    "status": "completed",
+    "details": {
+      "trial": 6,
+      "completed": false,
+      "duration_s": 2.7,
+      "path_length_m": 1.68,
+      "final_error_m": 4.151,
+      "energy_wh": 0.022711,
+      "collision_events": 1,
+      "final_position": [
+        1.4406,
+        0.8644
+      ]
+    }
+  },
+  {
+    "job_id": "65dc0200-aa64-44eb-b376-637ae2120f90",
+    "sequence": 10,
+    "timestamp": 1794981043.3610036,
+    "stage": "simulation_trial",
+    "status": "completed",
+    "details": {
+      "trial": 7,
+      "completed": false,
+      "duration_s": 2.7,
+      "path_length_m": 1.68,
+      "final_error_m": 4.151,
+      "energy_wh": 0.022711,
+      "collision_events": 1,
+      "final_position": [
+        1.4406,
+        0.8644
+      ]
+    }
+  },
+  {
+    "job_id": "65dc0200-aa64-44eb-b376-637ae2120f90",
+    "sequence": 11,
+    "timestamp": 1794981043.3610768,
+    "stage": "simulation_trial",
+    "status": "completed",
+    "details": {
+      "trial": 8,
+      "completed": false,
+      "duration_s": 2.7,
+      "path_length_m": 1.68,
+      "final_error_m": 4.151,
+      "energy_wh": 0.022711,
+      "collision_events": 1,
+      "final_position": [
+        1.4406,
+        0.8644
+      ]
+    }
+  },
+  {
+    "job_id": "65dc0200-aa64-44eb-b376-637ae2120f90",
+    "sequence": 12,
+    "timestamp": 1794981043.3611426,
+    "stage": "simulation_trial",
+    "status": "completed",
+    "details": {
+      "trial": 9,
+      "completed": false,
+      "duration_s": 2.7,
+      "path_length_m": 1.68,
+      "final_error_m": 4.151,
+      "energy_wh": 0.022711,
+      "collision_events": 1,
+      "final_position": [
+        1.4406,
+        0.8644
+      ]
+    }
+  },
+  {
+    "job_id": "65dc0200-aa64-44eb-b376-637ae2120f90",
+    "sequence": 13,
+    "timestamp": 1794981043.361207,
+    "stage": "simulation_trial",
+    "status": "completed",
+    "details": {
+      "trial": 10,
+      "completed": false,
+      "duration_s": 2.7,
+      "path_length_m": 1.68,
+      "final_error_m": 4.151,
+      "energy_wh": 0.022711,
+      "collision_events": 1,
+      "final_position": [
+        1.4406,
+        0.8644
+      ]
+    }
+  },
+  {
+    "job_id": "65dc0200-aa64-44eb-b376-637ae2120f90",
+    "sequence": 14,
+    "timestamp": 1794981043.3612225,
+    "stage": "simulation",
+    "status": "completed",
+    "details": {
+      "completed_trials": 10
+    }
+  },
+  {
+    "job_id": "65dc0200-aa64-44eb-b376-637ae2120f90",
+    "sequence": 15,
+    "timestamp": 1794981043.3612347,
+    "stage": "evaluation",
+    "status": "running",
+    "details": {}
+  },
+  {
+    "job_id": "65dc0200-aa64-44eb-b376-637ae2120f90",
+    "sequence": 16,
+    "timestamp": 1794981043.3613997,
+    "stage": "evaluation",
+    "status": "completed",
+    "details": {
+      "score": 0.0,
+      "completion_rate": 0.0,
+      "mean_error_m": 4.151,
+      "mean_energy_wh": 0.022711,
+      "mean_path_length_m": 1.68,
+      "collision_events": 10
+    }
+  }
+]

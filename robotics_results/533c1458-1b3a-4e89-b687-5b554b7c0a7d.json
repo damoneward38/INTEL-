@@ -1,0 +1,65 @@
+{
+  "engine_version": "1.0.0",
+  "job_id": "533c1458-1b3a-4e89-b687-5b554b7c0a7d",
+  "simulation_only": true,
+  "robot": {
+    "name": "Two Link Research Arm",
+    "robot_type": "two_link_arm",
+    "wheel_radius": 0.05,
+    "wheel_base": 0.3,
+    "max_speed": 1,
+    "max_acceleration": 0.5,
+    "battery_capacity_wh": 100,
+    "payload_kg": 1,
+    "arm_link_1_m": 0.5,
+    "arm_link_2_m": 0.4,
+    "joint_limit_deg": 150
+  },
+  "simulation": {
+    "duration_s": 10,
+    "timestep_s": 0.1,
+    "trials": 1,
+    "obstacle_margin_m": 0.15,
+    "target_tolerance_m": 0.1,
+    "seed": 42
+  },
+  "environment": {
+    "target": [
+      0.5,
+      0.4
+    ]
+  },
+  "trials": [
+    {
+      "reachable": true,
+      "within_joint_limits": true,
+      "target": [
+        0.5,
+        0.4
+      ],
+      "joint_angles_deg": [
+        0.0,
+        90.0
+      ],
+      "link_lengths_m": [
+        0.5,
+        0.4
+      ],
+      "target_distance_m": 0.6403
+    }
+  ],
+  "evaluation": {
+    "score": 100.0,
+    "reachable": true,
+    "within_joint_limits": true
+  },
+  "event_count": 7,
+  "limitations": [
+    "This is a virtual research simulation.",
+    "No physical robot was controlled.",
+    "Results depend on the supplied model and assumptions.",
+    "Results are not proof of real-world performance.",
+    "No hardware safety certification is provided."
+  ],
+  "sha256": "69bda85b020c4bde2edbfe4f7388e7f9a946b8d781b8dde01613a61470c04d42"
+}

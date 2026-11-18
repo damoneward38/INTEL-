@@ -1,0 +1,177 @@
+[
+  {
+    "job_id": "afe0d06e-0d75-4376-b463-64f30f8d17da",
+    "sequence": 1,
+    "timestamp": 1794981482.9495506,
+    "stage": "configuration_validation",
+    "status": "running",
+    "details": {}
+  },
+  {
+    "job_id": "afe0d06e-0d75-4376-b463-64f30f8d17da",
+    "sequence": 2,
+    "timestamp": 1794981482.9496338,
+    "stage": "configuration_validation",
+    "status": "completed",
+    "details": {
+      "robot_type": "differential_drive",
+      "planner": "straight_line",
+      "simulation_only": true
+    }
+  },
+  {
+    "job_id": "afe0d06e-0d75-4376-b463-64f30f8d17da",
+    "sequence": 3,
+    "timestamp": 1794981482.9496622,
+    "stage": "simulation",
+    "status": "running",
+    "details": {
+      "robot_type": "differential_drive",
+      "planner": "straight_line",
+      "trials": 5
+    }
+  },
+  {
+    "job_id": "afe0d06e-0d75-4376-b463-64f30f8d17da",
+    "sequence": 4,
+    "timestamp": 1794981482.9498534,
+    "stage": "simulation_trial",
+    "status": "completed",
+    "details": {
+      "trial": 1,
+      "planner": "straight_line",
+      "completed": false,
+      "duration_s": 2.9,
+      "path_length_m": 2.4,
+      "final_error_m": 3.2569,
+      "energy_wh": 0.028,
+      "collision_events": 1,
+      "final_position": [
+        1.6971,
+        1.6971
+      ],
+      "min_clearance_m": 0.1284
+    }
+  },
+  {
+    "job_id": "afe0d06e-0d75-4376-b463-64f30f8d17da",
+    "sequence": 5,
+    "timestamp": 1794981482.9499748,
+    "stage": "simulation_trial",
+    "status": "completed",
+    "details": {
+      "trial": 2,
+      "planner": "straight_line",
+      "completed": false,
+      "duration_s": 2.9,
+      "path_length_m": 2.4,
+      "final_error_m": 3.2569,
+      "energy_wh": 0.028,
+      "collision_events": 1,
+      "final_position": [
+        1.6971,
+        1.6971
+      ],
+      "min_clearance_m": 0.1284
+    }
+  },
+  {
+    "job_id": "afe0d06e-0d75-4376-b463-64f30f8d17da",
+    "sequence": 6,
+    "timestamp": 1794981482.9501455,
+    "stage": "simulation_trial",
+    "status": "completed",
+    "details": {
+      "trial": 3,
+      "planner": "straight_line",
+      "completed": false,
+      "duration_s": 2.9,
+      "path_length_m": 2.4,
+      "final_error_m": 3.2569,
+      "energy_wh": 0.028,
+      "collision_events": 1,
+      "final_position": [
+        1.6971,
+        1.6971
+      ],
+      "min_clearance_m": 0.1284
+    }
+  },
+  {
+    "job_id": "afe0d06e-0d75-4376-b463-64f30f8d17da",
+    "sequence": 7,
+    "timestamp": 1794981482.9502833,
+    "stage": "simulation_trial",
+    "status": "completed",
+    "details": {
+      "trial": 4,
+      "planner": "straight_line",
+      "completed": false,
+      "duration_s": 2.9,
+      "path_length_m": 2.4,
+      "final_error_m": 3.2569,
+      "energy_wh": 0.028,
+      "collision_events": 1,
+      "final_position": [
+        1.6971,
+        1.6971
+      ],
+      "min_clearance_m": 0.1284
+    }
+  },
+  {
+    "job_id": "afe0d06e-0d75-4376-b463-64f30f8d17da",
+    "sequence": 8,
+    "timestamp": 1794981482.9504108,
+    "stage": "simulation_trial",
+    "status": "completed",
+    "details": {
+      "trial": 5,
+      "planner": "straight_line",
+      "completed": false,
+      "duration_s": 2.9,
+      "path_length_m": 2.4,
+      "final_error_m": 3.2569,
+      "energy_wh": 0.028,
+      "collision_events": 1,
+      "final_position": [
+        1.6971,
+        1.6971
+      ],
+      "min_clearance_m": 0.1284
+    }
+  },
+  {
+    "job_id": "afe0d06e-0d75-4376-b463-64f30f8d17da",
+    "sequence": 9,
+    "timestamp": 1794981482.9504707,
+    "stage": "simulation",
+    "status": "completed",
+    "details": {
+      "completed_trials": 5
+    }
+  },
+  {
+    "job_id": "afe0d06e-0d75-4376-b463-64f30f8d17da",
+    "sequence": 10,
+    "timestamp": 1794981482.9504924,
+    "stage": "evaluation",
+    "status": "running",
+    "details": {}
+  },
+  {
+    "job_id": "afe0d06e-0d75-4376-b463-64f30f8d17da",
+    "sequence": 11,
+    "timestamp": 1794981482.9506972,
+    "stage": "evaluation",
+    "status": "completed",
+    "details": {
+      "score": 0.0,
+      "completion_rate": 0.0,
+      "mean_error_m": 3.2569,
+      "mean_energy_wh": 0.028,
+      "mean_path_length_m": 2.4,
+      "collision_events": 5
+    }
+  }
+]

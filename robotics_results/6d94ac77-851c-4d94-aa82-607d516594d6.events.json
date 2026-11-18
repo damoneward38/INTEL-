@@ -1,0 +1,165 @@
+[
+  {
+    "job_id": "6d94ac77-851c-4d94-aa82-607d516594d6",
+    "sequence": 1,
+    "timestamp": 1794981100.563463,
+    "stage": "configuration_validation",
+    "status": "running",
+    "details": {}
+  },
+  {
+    "job_id": "6d94ac77-851c-4d94-aa82-607d516594d6",
+    "sequence": 2,
+    "timestamp": 1794981100.5635476,
+    "stage": "configuration_validation",
+    "status": "completed",
+    "details": {
+      "robot_type": "differential_drive",
+      "simulation_only": true
+    }
+  },
+  {
+    "job_id": "6d94ac77-851c-4d94-aa82-607d516594d6",
+    "sequence": 3,
+    "timestamp": 1794981100.5635762,
+    "stage": "simulation",
+    "status": "running",
+    "details": {
+      "robot_type": "differential_drive",
+      "trials": 5
+    }
+  },
+  {
+    "job_id": "6d94ac77-851c-4d94-aa82-607d516594d6",
+    "sequence": 4,
+    "timestamp": 1794981100.5637193,
+    "stage": "simulation_trial",
+    "status": "completed",
+    "details": {
+      "trial": 1,
+      "completed": false,
+      "duration_s": 2.9,
+      "path_length_m": 2.4,
+      "final_error_m": 3.2569,
+      "energy_wh": 0.028,
+      "collision_events": 1,
+      "final_position": [
+        1.6971,
+        1.6971
+      ]
+    }
+  },
+  {
+    "job_id": "6d94ac77-851c-4d94-aa82-607d516594d6",
+    "sequence": 5,
+    "timestamp": 1794981100.5638027,
+    "stage": "simulation_trial",
+    "status": "completed",
+    "details": {
+      "trial": 2,
+      "completed": false,
+      "duration_s": 2.9,
+      "path_length_m": 2.4,
+      "final_error_m": 3.2569,
+      "energy_wh": 0.028,
+      "collision_events": 1,
+      "final_position": [
+        1.6971,
+        1.6971
+      ]
+    }
+  },
+  {
+    "job_id": "6d94ac77-851c-4d94-aa82-607d516594d6",
+    "sequence": 6,
+    "timestamp": 1794981100.5638978,
+    "stage": "simulation_trial",
+    "status": "completed",
+    "details": {
+      "trial": 3,
+      "completed": false,
+      "duration_s": 2.9,
+      "path_length_m": 2.4,
+      "final_error_m": 3.2569,
+      "energy_wh": 0.028,
+      "collision_events": 1,
+      "final_position": [
+        1.6971,
+        1.6971
+      ]
+    }
+  },
+  {
+    "job_id": "6d94ac77-851c-4d94-aa82-607d516594d6",
+    "sequence": 7,
+    "timestamp": 1794981100.563989,
+    "stage": "simulation_trial",
+    "status": "completed",
+    "details": {
+      "trial": 4,
+      "completed": false,
+      "duration_s": 2.9,
+      "path_length_m": 2.4,
+      "final_error_m": 3.2569,
+      "energy_wh": 0.028,
+      "collision_events": 1,
+      "final_position": [
+        1.6971,
+        1.6971
+      ]
+    }
+  },
+  {
+    "job_id": "6d94ac77-851c-4d94-aa82-607d516594d6",
+    "sequence": 8,
+    "timestamp": 1794981100.5640795,
+    "stage": "simulation_trial",
+    "status": "completed",
+    "details": {
+      "trial": 5,
+      "completed": false,
+      "duration_s": 2.9,
+      "path_length_m": 2.4,
+      "final_error_m": 3.2569,
+      "energy_wh": 0.028,
+      "collision_events": 1,
+      "final_position": [
+        1.6971,
+        1.6971
+      ]
+    }
+  },
+  {
+    "job_id": "6d94ac77-851c-4d94-aa82-607d516594d6",
+    "sequence": 9,
+    "timestamp": 1794981100.5641248,
+    "stage": "simulation",
+    "status": "completed",
+    "details": {
+      "completed_trials": 5
+    }
+  },
+  {
+    "job_id": "6d94ac77-851c-4d94-aa82-607d516594d6",
+    "sequence": 10,
+    "timestamp": 1794981100.5641453,
+    "stage": "evaluation",
+    "status": "running",
+    "details": {}
+  },
+  {
+    "job_id": "6d94ac77-851c-4d94-aa82-607d516594d6",
+    "sequence": 11,
+    "timestamp": 1794981100.564332,
+    "stage": "evaluation",
+    "status": "completed",
+    "details": {
+      "score": 0.0,
+      "completion_rate": 0.0,
+      "mean_error_m": 3.2569,
+      "mean_energy_wh": 0.028,
+      "mean_path_length_m": 2.4,
+      "collision_events": 5
+    }
+  }
+]

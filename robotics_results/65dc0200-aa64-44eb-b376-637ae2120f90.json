@@ -1,0 +1,201 @@
+{
+  "engine_version": "1.0.0",
+  "job_id": "65dc0200-aa64-44eb-b376-637ae2120f90",
+  "simulation_only": true,
+  "robot": {
+    "name": "Uploaded Research Robot",
+    "robot_type": "differential_drive",
+    "wheel_radius": 0.05,
+    "wheel_base": 0.3,
+    "max_speed": 0.6,
+    "max_acceleration": 0.4,
+    "battery_capacity_wh": 80,
+    "payload_kg": 1,
+    "arm_link_1_m": 0.5,
+    "arm_link_2_m": 0.4,
+    "joint_limit_deg": 150.0
+  },
+  "simulation": {
+    "duration_s": 30,
+    "timestep_s": 0.1,
+    "trials": 10,
+    "obstacle_margin_m": 0.2,
+    "target_tolerance_m": 0.1,
+    "seed": 42
+  },
+  "environment": {
+    "start": [
+      0,
+      0
+    ],
+    "goal": [
+      5,
+      3
+    ],
+    "obstacles": [
+      {
+        "center": [
+          2,
+          1
+        ],
+        "radius": 0.4
+      },
+      {
+        "center": [
+          3,
+          2
+        ],
+        "radius": 0.3
+      }
+    ]
+  },
+  "trials": [
+    {
+      "trial": 1,
+      "completed": false,
+      "duration_s": 2.7,
+      "path_length_m": 1.68,
+      "final_error_m": 4.151,
+      "energy_wh": 0.022711,
+      "collision_events": 1,
+      "final_position": [
+        1.4406,
+        0.8644
+      ]
+    },
+    {
+      "trial": 2,
+      "completed": false,
+      "duration_s": 2.7,
+      "path_length_m": 1.68,
+      "final_error_m": 4.151,
+      "energy_wh": 0.022711,
+      "collision_events": 1,
+      "final_position": [
+        1.4406,
+        0.8644
+      ]
+    },
+    {
+      "trial": 3,
+      "completed": false,
+      "duration_s": 2.7,
+      "path_length_m": 1.68,
+      "final_error_m": 4.151,
+      "energy_wh": 0.022711,
+      "collision_events": 1,
+      "final_position": [
+        1.4406,
+        0.8644
+      ]
+    },
+    {
+      "trial": 4,
+      "completed": false,
+      "duration_s": 2.7,
+      "path_length_m": 1.68,
+      "final_error_m": 4.151,
+      "energy_wh": 0.022711,
+      "collision_events": 1,
+      "final_position": [
+        1.4406,
+        0.8644
+      ]
+    },
+    {
+      "trial": 5,
+      "completed": false,
+      "duration_s": 2.7,
+      "path_length_m": 1.68,
+      "final_error_m": 4.151,
+      "energy_wh": 0.022711,
+      "collision_events": 1,
+      "final_position": [
+        1.4406,
+        0.8644
+      ]
+    },
+    {
+      "trial": 6,
+      "completed": false,
+      "duration_s": 2.7,
+      "path_length_m": 1.68,
+      "final_error_m": 4.151,
+      "energy_wh": 0.022711,
+      "collision_events": 1,
+      "final_position": [
+        1.4406,
+        0.8644
+      ]
+    },
+    {
+      "trial": 7,
+      "completed": false,
+      "duration_s": 2.7,
+      "path_length_m": 1.68,
+      "final_error_m": 4.151,
+      "energy_wh": 0.022711,
+      "collision_events": 1,
+      "final_position": [
+        1.4406,
+        0.8644
+      ]
+    },
+    {
+      "trial": 8,
+      "completed": false,
+      "duration_s": 2.7,
+      "path_length_m": 1.68,
+      "final_error_m": 4.151,
+      "energy_wh": 0.022711,
+      "collision_events": 1,
+      "final_position": [
+        1.4406,
+        0.8644
+      ]
+    },
+    {
+      "trial": 9,
+      "completed": false,
+      "duration_s": 2.7,
+      "path_length_m": 1.68,
+      "final_error_m": 4.151,
+      "energy_wh": 0.022711,
+      "collision_events": 1,
+      "final_position": [
+        1.4406,
+        0.8644
+      ]
+    },
+    {
+      "trial": 10,
+      "completed": false,
+      "duration_s": 2.7,
+      "path_length_m": 1.68,
+      "final_error_m": 4.151,
+      "energy_wh": 0.022711,
+      "collision_events": 1,
+      "final_position": [
+        1.4406,
+        0.8644
+      ]
+    }
+  ],
+  "evaluation": {
+    "score": 0.0,
+    "completion_rate": 0.0,
+    "mean_error_m": 4.151,
+    "mean_energy_wh": 0.022711,
+    "mean_path_length_m": 1.68,
+    "collision_events": 10
+  },
+  "event_count": 16,
+  "limitations": [
+    "This is a virtual research simulation.",
+    "No physical robot was controlled.",
+    "Results depend on the supplied model and assumptions.",
+    "Results are not proof of real-world performance.",
+    "No hardware safety certification is provided."
+  ],
+  "sha256": "18d1f94f97df0a3bbf41c67510283aa7b5010084f8608897fc01deaeb531cf94"
+}

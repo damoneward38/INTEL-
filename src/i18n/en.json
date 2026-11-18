@@ -21,6 +21,7 @@
       "pgx": "Pharmacogenomics Vault",
       "optimize": "AutoOptimizeAI",
       "autonomous": "Autonomous Loop",
+      "matrix": "Matrix Diff & Sweep",
       "orchestrator": "Master Orchestrator",
       "provenance": "Provenance & Licenses",
       "eco": "Eco-Impact Auditor",

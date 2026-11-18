@@ -152,7 +152,9 @@ import {
 import { PIPELINE_STAGE_DEFINITIONS } from './server/commandPipeline/stages.ts';
 import {
   DEFAULT_ARM_ROBOT_CONFIG,
+  DEFAULT_AVOIDANCE_ROBOT_CONFIG,
   DEFAULT_MOBILE_ROBOT_CONFIG,
+  DEFAULT_QUADROTOR_CONFIG,
   DEFAULT_RESEARCH_UPLOAD_CONFIG,
   getRoboticsPipelineManifest,
   getSavedRoboticsRun,
@@ -160,6 +162,10 @@ import {
   listSavedRoboticsRuns,
   runRoboticsEnginePython,
 } from './server/commandPipeline/roboticsBridge.ts';
+import {
+  MATRIX_COMPARISON_PRESETS,
+  compareMatricesAndEvaluate,
+} from './server/commandPipeline/matrixComparator.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1988,6 +1994,24 @@ export function createApp() {
     }
   );
 
+  app.get('/api/pipeline/matrix-presets', (_req, res) => {
+    res.json({ presets: MATRIX_COMPARISON_PRESETS });
+  });
+
+  app.post('/api/pipeline/compare-matrices', async (req, res) => {
+    const authReq = req as AuthenticatedRequest;
+    try {
+      const comparison = await compareMatricesAndEvaluate(
+        req.body,
+        authReq.sessionUser?.userId ?? 'research-operator'
+      );
+      res.status(200).json({ comparison });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Matrix comparison failed.';
+      res.status(400).json({ error: msg });
+    }
+  });
+
   // -------------------------------------------------------------------------
   // 15. Virtual Robotics Research Engine (robotics_engine.py bridge)
   // -------------------------------------------------------------------------
@@ -2003,7 +2027,9 @@ export function createApp() {
       runs: listSavedRoboticsRuns(25),
       presets: {
         differential_drive: DEFAULT_MOBILE_ROBOT_CONFIG,
+        potential_field: DEFAULT_AVOIDANCE_ROBOT_CONFIG,
         two_link_arm: DEFAULT_ARM_ROBOT_CONFIG,
+        quadrotor_3d: DEFAULT_QUADROTOR_CONFIG,
         research_upload_example: DEFAULT_RESEARCH_UPLOAD_CONFIG,
       },
       manifest: getRoboticsPipelineManifest(),

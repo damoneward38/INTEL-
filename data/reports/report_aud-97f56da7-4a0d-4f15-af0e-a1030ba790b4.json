@@ -1,0 +1,120 @@
+{
+  "auditUuid": "aud-97f56da7-4a0d-4f15-af0e-a1030ba790b4",
+  "auditLogPath": "data/orchestrator_audit.jsonl",
+  "reportPath": "data/reports/report_aud-97f56da7-4a0d-4f15-af0e-a1030ba790b4.json",
+  "simulatorEnabled": false,
+  "evaluationStatus": "not_evaluated",
+  "physicalExecution": false,
+  "filename": "safe_default_test.txt",
+  "language": "en",
+  "entitiesCount": 3,
+  "embeddingSource": "tfidf-hash-64d",
+  "embeddingDimensions": 64,
+  "protocolId": "proto-97f8c066",
+  "proposalId": "prop-a090b458",
+  "simulationEngine": "langevin-md",
+  "reward": null,
+  "safetyPassed": false,
+  "locked": false,
+  "slackAlertSent": false,
+  "stages": [
+    {
+      "stage": "ingest",
+      "status": "completed",
+      "durationMs": 0,
+      "summary": "Ingested \"safe_default_test.txt\" (100 extracted bytes)",
+      "digestSha256": "df3bdf88063587265083dd9e7b787203a817fe8680217928197573e8ae88b404",
+      "metrics": {
+        "bytes": 100
+      }
+    },
+    {
+      "stage": "detect_lang",
+      "status": "completed",
+      "durationMs": 0,
+      "summary": "Detected primary script/language: en",
+      "digestSha256": "df2020add177993a1e069639d3719d1dd6ef05640b70fa267fd9f5e230cb1a47",
+      "metrics": {
+        "language": "en"
+      }
+    },
+    {
+      "stage": "extract_entities",
+      "status": "completed",
+      "durationMs": 0,
+      "summary": "Extracted 3 structured entities (baseline pattern/keyword extractor)",
+      "digestSha256": "98a31cb2c21df0e2024b94e7d25ba11f58c54fdce0405263e9e80b2c40047f65",
+      "metrics": {
+        "entitiesCount": 3
+      }
+    },
+    {
+      "stage": "embed_text",
+      "status": "completed",
+      "durationMs": 2,
+      "summary": "Generated 64-dim context vector via tfidf-hash-64d",
+      "digestSha256": "8a30b6f5bae04233f96aa16495445e48e6f017251ba35f42c7abbf31a8511caa",
+      "metrics": {
+        "dimensions": 64,
+        "source": "tfidf-hash-64d"
+      }
+    },
+    {
+      "stage": "link_graph",
+      "status": "completed",
+      "durationMs": 1,
+      "summary": "Linked 3 entities into graph node aodoc-9aaf4b59",
+      "digestSha256": "870132199670426d1ab069e12ef5c47cb187d3112fc51af05bb362e06b9c6dd3",
+      "metrics": {
+        "documentId": "aodoc-9aaf4b59",
+        "entitiesCount": 3
+      }
+    },
+    {
+      "stage": "plan_policy",
+      "status": "completed",
+      "durationMs": 0,
+      "summary": "Approved protocol proto-97f8c066 and proposed bounded step thermostat_gamma=1.2 [software_only]",
+      "digestSha256": "fbb7e984c5adb8b2c097661df1fb416450dea7279f31bdf10dda26797078b328",
+      "metrics": {
+        "protocolId": "proto-97f8c066",
+        "proposalId": "prop-a090b458",
+        "proposedValue": 1.2
+      }
+    },
+    {
+      "stage": "execute",
+      "status": "skipped",
+      "durationMs": 0,
+      "summary": "Isolated simulator disabled (pass --enable-simulator or check opt-in to execute)",
+      "digestSha256": "fc1d85bd9bd46793fed03c7a6e6e4f070c9e35f1abbf5682dac10c8281362d33",
+      "metrics": {
+        "simulatorEnabled": false
+      }
+    },
+    {
+      "stage": "evaluate",
+      "status": "skipped",
+      "durationMs": 0,
+      "summary": "Not evaluated (no simulator result available)",
+      "digestSha256": "dd39756ffb15f6ba91846169cfb465b04aec5b70f15956822488acc44c3f6a5c",
+      "metrics": {
+        "evaluationStatus": "not_evaluated"
+      }
+    },
+    {
+      "stage": "learn_and_lock",
+      "status": "skipped",
+      "durationMs": 1,
+      "summary": "Protocol not locked (no verified evaluation); wrote data/reports/report_aud-97f56da7-4a0d-4f15-af0e-a1030ba790b4.json",
+      "digestSha256": "1835e8b07886fb42738e2374d97bca1f20c3f775b3b844bfa5cdb50c886a1e20",
+      "metrics": {
+        "locked": false,
+        "slackAlertSent": false,
+        "reportPath": "data/reports/report_aud-97f56da7-4a0d-4f15-af0e-a1030ba790b4.json"
+      }
+    }
+  ],
+  "reportMarkdown": "# INTEL Master Orchestrator Report\n- **Audit UUID**: `aud-97f56da7-4a0d-4f15-af0e-a1030ba790b4`\n- **Report File**: `data/reports/report_aud-97f56da7-4a0d-4f15-af0e-a1030ba790b4.json`\n- **Artifact**: `safe_default_test.txt` (en)\n- **Physical Execution**: `false`\n- **Simulator Enabled**: `false`\n- **Entities Linked**: 3 (node `aodoc-9aaf4b59`)\n- **Context Vector**: 64d via `tfidf-hash-64d`\n- **Protocol**: `proto-97f8c066` (thermostat_gamma=1.2)\n- **Simulation Worker**: Skipped (enable-simulator opt-in not active)\n- **Evaluation**: Not evaluated\n- **Registry Lock**: NOT_LOCKED\n- **Timestamp**: 2026-11-18T05:51:41.425Z",
+  "createdAt": "2026-11-18T05:51:41.425Z"
+}
